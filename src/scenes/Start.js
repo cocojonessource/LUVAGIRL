@@ -1,5 +1,4 @@
 export class Start extends Phaser.Scene {
-
     constructor() {
         super('Start');
     }
@@ -12,20 +11,21 @@ export class Start extends Phaser.Scene {
         this.load.image('closeover', 'assets/closeover.png');
 
         this.load.image('LuvaGirl', 'assets/LuvaGirl.png');
-        this.load.image('LuvaGirlBad', 'assets/LuvaGirlbad.png');
-        this.load.image('LuvaGirlBonus', 'assets/LuvaGirlbonus.png');
+        this.load.image('Luvagirldrag', 'assets/Luvagirldrag.png');
+        this.load.image('LuvaGirlBad', 'assets/luvagirlbad.png');
+        this.load.image('LuvaGirlBonus', 'assets/luvagirlbonus.png');
 
-        this.load.image('heartBlue', 'assets/blue.png');
-        this.load.image('heartGreen', 'assets/green.png');
-        this.load.image('heartPink', 'assets/pink.png');
-        this.load.image('heartYellow', 'assets/yellow.png');
+        this.load.image('heartBlue', 'assets/Blue.png');
+        this.load.image('heartGreen', 'assets/Green.png');
+        this.load.image('heartPink', 'assets/Pink.png');
+        this.load.image('heartYellow', 'assets/Yellow.png');
 
-        this.load.image('lifeFull', 'assets/lifescore.png');
-        this.load.image('lifeLost', 'assets/lostscore.png');
+        this.load.image('lifeFull', 'assets/Lifescore.png');
+        this.load.image('lifeLost', 'assets/Lostscore.png');
 
         this.load.image('tomato', 'assets/Tomotoe.png');
-        this.load.image('grammy', 'assets/grammy.png');
-        this.load.image('ramenItem', 'assets/ramen.png');
+        this.load.image('grammy', 'assets/Grammy.png');
+        this.load.image('ramenItem', 'assets/Ramen.png');
         this.load.image('noteItem', 'assets/note.png');
 
         this.load.audio('gameOverSound', 'assets/GameOver.mp3');
@@ -47,16 +47,43 @@ export class Start extends Phaser.Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
 
-        // mobile touch / drag controls
+        this.homePointerMoving = false;
+        this.homeMoveVisualTimer = null;
+        this.homeMoveVisualDelay = 120;
+
         this.input.on('pointerdown', (pointer) => {
-            if (this.gameStarted && !this.isGameOver) {
+            if (this.isGameOver) return;
+
+            if (!this.gameStarted) {
+                this.ship.x = Phaser.Math.Clamp(pointer.x, 30, 330);
+                this.setHomeMoveVisualActive();
+                return;
+            }
+
+            if (this.gameStarted) {
                 this.ship.x = Phaser.Math.Clamp(pointer.x, 30, 330);
             }
         });
 
         this.input.on('pointermove', (pointer) => {
-            if (pointer.isDown && this.gameStarted && !this.isGameOver) {
+            if (this.isGameOver) return;
+
+            if (!this.gameStarted) {
+                if (pointer.isDown) {
+                    this.ship.x = Phaser.Math.Clamp(pointer.x, 30, 330);
+                    this.setHomeMoveVisualActive();
+                }
+                return;
+            }
+
+            if (pointer.isDown && this.gameStarted) {
                 this.ship.x = Phaser.Math.Clamp(pointer.x, 30, 330);
+            }
+        });
+
+        this.input.on('pointerup', () => {
+            if (!this.gameStarted) {
+                this.scheduleHomeIdleRestore();
             }
         });
 
@@ -93,7 +120,6 @@ export class Start extends Phaser.Scene {
         this.spawnTimer = null;
         this.extraSpawnTimer = null;
 
-        // fixed lanes help keep the game dodgeable
         this.spawnLanes = [52, 92, 132, 180, 228, 268, 308];
         this.lastSpawnLane = null;
         this.lastTomatoLane = null;
@@ -109,13 +135,7 @@ export class Start extends Phaser.Scene {
             color: '#ffd6f2',
             stroke: '#ff69b4',
             strokeThickness: 4,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 14,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 14, fill: true }
         }).setOrigin(0.5);
 
         this.howToTitle = this.add.text(180, 154, 'HOW TO PLAY', {
@@ -157,13 +177,7 @@ export class Start extends Phaser.Scene {
             color: '#ffffff',
             stroke: '#6d3bb8',
             strokeThickness: 2,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#6d3bb8',
-                blur: 8,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#6d3bb8', blur: 8, fill: true }
         }).setOrigin(0.5);
 
         this.presaveButton = this.add.text(180, 372, 'Presave Luva Girl', {
@@ -172,13 +186,7 @@ export class Start extends Phaser.Scene {
             color: '#ffd6f2',
             stroke: '#ff69b4',
             strokeThickness: 3,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 12,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 12, fill: true }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         this.addButtonFeedback(this.presaveButton, () => {
@@ -192,13 +200,7 @@ export class Start extends Phaser.Scene {
             color: '#ffff00',
             stroke: '#ff69b4',
             strokeThickness: 2,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 10,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 10, fill: true }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         this.addButtonFeedback(this.startButton, () => {
@@ -229,8 +231,71 @@ export class Start extends Phaser.Scene {
         });
     }
 
+    setHomeMoveVisualActive() {
+        if (this.gameStarted || this.isGameOver) return;
+
+        this.homePointerMoving = true;
+
+        if (this.reactionTimer) return;
+
+        if (this.ship.texture.key !== 'Luvagirldrag') {
+            this.ship.setTexture('Luvagirldrag');
+            this.ship.setScale(0.22);
+        }
+
+        if (this.homeMoveVisualTimer) {
+            this.homeMoveVisualTimer.remove(false);
+            this.homeMoveVisualTimer = null;
+        }
+
+        this.homeMoveVisualTimer = this.time.addEvent({
+            delay: this.homeMoveVisualDelay,
+            callback: () => {
+                this.homePointerMoving = false;
+                this.restoreHomeIdleIfNeeded();
+            }
+        });
+    }
+
+    scheduleHomeIdleRestore() {
+        if (this.gameStarted || this.isGameOver) return;
+
+        if (this.homeMoveVisualTimer) {
+            this.homeMoveVisualTimer.remove(false);
+        }
+
+        this.homeMoveVisualTimer = this.time.addEvent({
+            delay: this.homeMoveVisualDelay,
+            callback: () => {
+                this.homePointerMoving = false;
+                this.restoreHomeIdleIfNeeded();
+            }
+        });
+    }
+
+    restoreHomeIdleIfNeeded() {
+        if (this.gameStarted || this.isGameOver) return;
+        if (this.homePointerMoving) return;
+        if (this.reactionTimer) return;
+
+        if (this.ship && this.ship.active && this.ship.texture.key !== 'LuvaGirl') {
+            this.ship.setTexture('LuvaGirl');
+            this.ship.setScale(0.22);
+            this.ship.angle = 0;
+            this.ship.y = this.shipBaseY;
+        }
+    }
+
     startGame() {
         this.gameStarted = true;
+
+        if (this.homeMoveVisualTimer) {
+            this.homeMoveVisualTimer.remove(false);
+            this.homeMoveVisualTimer = null;
+        }
+        this.homePointerMoving = false;
+        this.ship.setTexture('LuvaGirl');
+        this.ship.setScale(0.22);
 
         this.startTitle.destroy();
         this.howToTitle.destroy();
@@ -244,7 +309,6 @@ export class Start extends Phaser.Scene {
         this.setupHUD();
         this.startBackgroundMusic();
 
-        // main spawn
         this.spawnTimer = this.time.addEvent({
             delay: 560,
             callback: this.spawnItem,
@@ -252,8 +316,6 @@ export class Start extends Phaser.Scene {
             loop: true
         });
 
-        // extra controlled spawn so the screen doesn't feel empty,
-        // while still keeping the game dodgeable
         this.extraSpawnTimer = this.time.addEvent({
             delay: 980,
             callback: () => {
@@ -280,38 +342,22 @@ export class Start extends Phaser.Scene {
     startBackgroundMusic() {
         if (this.sound && this.cache.audio.exists('bgMusic')) {
             if (!this.bgMusic || !this.bgMusic.isPlaying) {
-                this.bgMusic = this.sound.add('bgMusic', {
-                    loop: true,
-                    volume: 0.55
-                });
+                this.bgMusic = this.sound.add('bgMusic', { loop: true, volume: 0.55 });
                 this.bgMusic.play();
             }
         }
     }
 
     setupHUD() {
-        this.add.text(10, 8, 'Coco Jones', {
-            fontSize: '12px',
-            color: '#ffffff'
-        });
-
-        this.add.text(10, 22, 'Luva Girl', {
-            fontSize: '12px',
-            color: '#ffffff'
-        });
+        this.add.text(10, 8, 'Coco Jones', { fontSize: '12px', color: '#ffffff' });
+        this.add.text(10, 22, 'Luva Girl', { fontSize: '12px', color: '#ffffff' });
 
         this.heartsLabelText = this.add.text(180, 8, 'Hearts', {
             fontSize: '16px',
             color: '#ffffff',
             stroke: '#ff69b4',
             strokeThickness: 2,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 8,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 8, fill: true }
         }).setOrigin(0.5, 0);
 
         this.heartsNumberText = this.add.text(180, 24, '0', {
@@ -319,13 +365,7 @@ export class Start extends Phaser.Scene {
             color: '#ffffff',
             stroke: '#ff69b4',
             strokeThickness: 2,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 8,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 8, fill: true }
         }).setOrigin(0.5, 0);
 
         this.createLifeIcons();
@@ -337,13 +377,7 @@ export class Start extends Phaser.Scene {
             padding: { left: 6, right: 6, top: 4, bottom: 4 },
             stroke: '#ff69b4',
             strokeThickness: 1,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 8,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 8, fill: true }
         }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
 
         this.endGameButton.on('pointerdown', () => {
@@ -361,7 +395,6 @@ export class Start extends Phaser.Scene {
 
     createLifeIcons() {
         this.lifeIcons = [];
-
         const startX = 290;
         const y = 20;
         const spacing = 28;
@@ -370,7 +403,6 @@ export class Start extends Phaser.Scene {
             const icon = this.add.image(startX + (i * spacing), y, 'lifeFull')
                 .setScale(0.2)
                 .setOrigin(0.5, 0.5);
-
             this.lifeIcons.push(icon);
         }
     }
@@ -386,14 +418,31 @@ export class Start extends Phaser.Scene {
     }
 
     update() {
-        if (!this.gameStarted) return;
         if (this.isGameOver) return;
 
-        if (this.cursors.left.isDown) this.ship.x -= 5;
-        if (this.cursors.right.isDown) this.ship.x += 5;
+        let movedThisFrame = false;
+
+        if (this.cursors.left.isDown) {
+            this.ship.x -= 5;
+            movedThisFrame = true;
+        }
+
+        if (this.cursors.right.isDown) {
+            this.ship.x += 5;
+            movedThisFrame = true;
+        }
 
         if (this.ship.x < 30) this.ship.x = 30;
         if (this.ship.x > 330) this.ship.x = 330;
+
+        if (!this.gameStarted) {
+            if (movedThisFrame) {
+                this.setHomeMoveVisualActive();
+            } else {
+                this.restoreHomeIdleIfNeeded();
+            }
+            return;
+        }
 
         this.items.children.iterate((item) => {
             if (!item || !item.active) return;
@@ -425,7 +474,6 @@ export class Start extends Phaser.Scene {
 
             const catchX = this.ship.x;
             const catchY = this.catchZoneY;
-
             const dx = Math.abs(item.x - catchX);
             const dy = Math.abs(item.y - catchY);
 
@@ -444,7 +492,6 @@ export class Start extends Phaser.Scene {
             if (this.lastTomatoLane !== null) {
                 laneChoices = laneChoices.filter((_, index) => Math.abs(index - this.lastTomatoLane) >= 2);
             }
-
             if (laneChoices.length === 0) {
                 laneChoices = [...this.spawnLanes];
             }
@@ -452,7 +499,6 @@ export class Start extends Phaser.Scene {
             if (this.lastSpawnLane !== null) {
                 laneChoices = laneChoices.filter((_, index) => index !== this.lastSpawnLane);
             }
-
             if (laneChoices.length === 0) {
                 laneChoices = [...this.spawnLanes];
             }
@@ -582,7 +628,6 @@ export class Start extends Phaser.Scene {
 
         if (!isIconStage) {
             if (roll <= 54) return 'heart';
-
             if (roll <= 57) {
                 if (this.ramenSpawnCount < this.maxRamenSpawns) {
                     this.ramenSpawnCount += 1;
@@ -590,7 +635,6 @@ export class Start extends Phaser.Scene {
                 }
                 return 'heart';
             }
-
             if (roll <= 60) {
                 if (this.musicSpawnCount < this.maxMusicSpawns) {
                     this.musicSpawnCount += 1;
@@ -598,12 +642,10 @@ export class Start extends Phaser.Scene {
                 }
                 return 'heart';
             }
-
             return 'tomato';
         }
 
         if (roll <= 34) return 'heart';
-
         if (roll <= 37) {
             if (this.ramenSpawnCount < this.maxRamenSpawns) {
                 this.ramenSpawnCount += 1;
@@ -611,7 +653,6 @@ export class Start extends Phaser.Scene {
             }
             return 'heart';
         }
-
         if (roll <= 40) {
             if (this.musicSpawnCount < this.maxMusicSpawns) {
                 this.musicSpawnCount += 1;
@@ -619,7 +660,6 @@ export class Start extends Phaser.Scene {
             }
             return 'heart';
         }
-
         return 'tomato';
     }
 
@@ -722,6 +762,8 @@ export class Start extends Phaser.Scene {
         this.reactionTimer = this.time.addEvent({
             delay: 450,
             callback: () => {
+                this.reactionTimer = null;
+
                 if (this.ship && this.ship.active && !this.isGameOver) {
                     this.ship.setTexture('LuvaGirl');
                     this.ship.setScale(0.22);
@@ -763,7 +805,6 @@ export class Start extends Phaser.Scene {
 
         if (this.heartsCaught >= 60) {
             this.currentFallSpeed = 8;
-
             if (!this.iconLevelShown) {
                 this.iconLevelShown = true;
                 this.currentLevelName = 'ICON Level';
@@ -803,13 +844,7 @@ export class Start extends Phaser.Scene {
             color: '#ffff66',
             stroke: '#ff69b4',
             strokeThickness: 4,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 16,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 16, fill: true }
         }).setOrigin(0.5);
 
         this.tweens.add({
@@ -818,7 +853,9 @@ export class Start extends Phaser.Scene {
             scale: 1.08,
             delay: 1000,
             duration: 900,
-            onComplete: () => { levelText.destroy(); }
+            onComplete: () => {
+                levelText.destroy();
+            }
         });
     }
 
@@ -828,13 +865,7 @@ export class Start extends Phaser.Scene {
             color: '#ffff66',
             stroke: '#000',
             strokeThickness: 4,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ffff66',
-                blur: 12,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ffff66', blur: 12, fill: true }
         }).setOrigin(0.5);
 
         this.tweens.add({
@@ -842,7 +873,9 @@ export class Start extends Phaser.Scene {
             y: msg.y - 55,
             alpha: 0,
             duration: 1200,
-            onComplete: () => { msg.destroy(); }
+            onComplete: () => {
+                msg.destroy();
+            }
         });
     }
 
@@ -852,13 +885,7 @@ export class Start extends Phaser.Scene {
             color: '#ffff66',
             stroke: '#000',
             strokeThickness: 4,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ffff66',
-                blur: 12,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ffff66', blur: 12, fill: true }
         }).setOrigin(0.5);
 
         this.tweens.add({
@@ -866,7 +893,9 @@ export class Start extends Phaser.Scene {
             y: msg.y - 55,
             alpha: 0,
             duration: 1200,
-            onComplete: () => { msg.destroy(); }
+            onComplete: () => {
+                msg.destroy();
+            }
         });
     }
 
@@ -876,13 +905,7 @@ export class Start extends Phaser.Scene {
             color: '#ff4d4d',
             stroke: '#4b0000',
             strokeThickness: 4,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff4d4d',
-                blur: 10,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff4d4d', blur: 10, fill: true }
         }).setOrigin(0.5);
 
         this.tweens.add({
@@ -890,7 +913,9 @@ export class Start extends Phaser.Scene {
             y: msg.y - 45,
             alpha: 0,
             duration: 1100,
-            onComplete: () => { msg.destroy(); }
+            onComplete: () => {
+                msg.destroy();
+            }
         });
     }
 
@@ -913,6 +938,11 @@ export class Start extends Phaser.Scene {
             this.reactionTimer = null;
         }
 
+        if (this.homeMoveVisualTimer) {
+            this.homeMoveVisualTimer.remove(false);
+            this.homeMoveVisualTimer = null;
+        }
+
         this.items.children.iterate((item) => {
             if (item) item.destroy();
         });
@@ -933,8 +963,7 @@ export class Start extends Phaser.Scene {
 
         this.add.rectangle(180, 320, 300, 420, 0x000000, 0.9);
 
-        this.gameOverHead = this.add.image(180, 150, 'openover')
-            .setScale(0.32);
+        this.gameOverHead = this.add.image(180, 150, 'openover').setScale(0.32);
 
         this.tweens.add({
             targets: this.gameOverHead,
@@ -966,13 +995,7 @@ export class Start extends Phaser.Scene {
             align: 'center',
             stroke: '#4b1e6d',
             strokeThickness: 4,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 16,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 16, fill: true }
         }).setOrigin(0.5);
 
         this.add.text(180, 295, 'Hearts Collected', {
@@ -980,13 +1003,7 @@ export class Start extends Phaser.Scene {
             color: '#fff',
             stroke: '#ff69b4',
             strokeThickness: 2,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 10,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 10, fill: true }
         }).setOrigin(0.5);
 
         this.add.text(180, 330, String(this.heartsCaught), {
@@ -994,13 +1011,7 @@ export class Start extends Phaser.Scene {
             color: '#fff',
             stroke: '#ff69b4',
             strokeThickness: 3,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 12,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 12, fill: true }
         }).setOrigin(0.5);
 
         this.add.text(180, 370, levelText, {
@@ -1008,13 +1019,7 @@ export class Start extends Phaser.Scene {
             color: '#fff',
             stroke: '#ff69b4',
             strokeThickness: 2,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 12,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 12, fill: true }
         }).setOrigin(0.5);
 
         this.add.text(180, 420, 'Presave Luva Girl', {
@@ -1022,19 +1027,17 @@ export class Start extends Phaser.Scene {
             color: '#ffff00',
             stroke: '#ff69b4',
             strokeThickness: 2,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 12,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 12, fill: true }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
                 window.open('https://link.fans/luvagirl', '_blank');
             })
-            .on('pointerover', function () { this.setColor('#ff69b4'); })
-            .on('pointerout', function () { this.setColor('#ffff00'); });
+            .on('pointerover', function () {
+                this.setColor('#ff69b4');
+            })
+            .on('pointerout', function () {
+                this.setColor('#ffff00');
+            });
 
         this.add.text(180, 448, 'Made by Source', {
             fontSize: '14px',
@@ -1048,13 +1051,7 @@ export class Start extends Phaser.Scene {
             color: '#ffff00',
             stroke: '#ff69b4',
             strokeThickness: 2,
-            shadow: {
-                offsetX: 0,
-                offsetY: 0,
-                color: '#ff69b4',
-                blur: 12,
-                fill: true
-            }
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 12, fill: true }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         playAgain.on('pointerdown', () => {
