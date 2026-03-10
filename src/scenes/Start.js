@@ -12,7 +12,7 @@ export class Start extends Phaser.Scene {
         this.load.image('openover', 'assets/Tomatoend1.PNG');
         this.load.image('closeover', 'assets/Tomatoend2.PNG');
 
-        this.load.image('LuvaGirl', 'assets/LuvaGirl.PNG');
+        this.load.image('LuvaGirl', 'assets/LuvaGirl.png');
         this.load.image('Luvagirldrag', 'assets/Luvagirldrag.PNG');
         this.load.image('LuvaGirlBad', 'assets/LuvaGirlbad.PNG');
         this.load.image('LuvaGirlBonus', 'assets/LuvaGirlbonus.PNG');
@@ -33,7 +33,6 @@ export class Start extends Phaser.Scene {
         this.load.image('grammy', 'assets/grammy.png');
         this.load.image('ramenItem', 'assets/ramen.png');
         this.load.image('noteItem', 'assets/note.png');
-        this.load.image('starItem', 'assets/Star.PNG');
         this.load.image('laysItem', 'assets/Lays.png');
 
         this.load.audio('gameOverSound', 'assets/GameOver.mp3');
@@ -87,9 +86,13 @@ export class Start extends Phaser.Scene {
         this.grammyUnlocked = false;
         this.grammySpawned = false;
         this.grammyCaught = false;
+        this.grammyForcedSpawnPending = false;
 
+        this.laysUnlocked = false;
+        this.laysForcedSpawnPending = false;
+        this.laysRegularSpawnConsumed = false;
         this.firstLaysCinematicDone = false;
-        this.firstStarCinematicDone = false;
+        this.nextChaosLaysAt = 1100;
 
         this.musicSpawnCount = 0;
         this.ramenSpawnCount = 0;
@@ -114,7 +117,6 @@ export class Start extends Phaser.Scene {
         this.extraSpawnTimer = null;
 
         this.spawnLanes = [52, 92, 132, 180, 228, 268, 308];
-        this.centerLaneIndex = 3;
         this.lastSpawnLane = null;
         this.lastTomatoLane = null;
         this.lastSpawnType = null;
@@ -127,69 +129,29 @@ export class Start extends Phaser.Scene {
         this.lastWaveSpawnAt = 0;
         this.lastRefillSpawnAt = 0;
 
-        this.laysLaterThresholds = [350, 500, 800, 950, 1000, 1500, 2100, 4000, 5000];
-        this.starLaterThresholds = [400, 600, 900, 1500, 3000];
-        this.laysSpawnedAt = {};
-        this.starPowerSpawnedAt = {};
-        this.starPowerCaughtAt = {};
-
-        this.pendingNormalThresholdSpawns = [];
-
-        this.invincibleActive = false;
-        this.invincibleVisibleActive = false;
-        this.invincibleDuration = 10000;
-        this.invincibleGraceDuration = 1000;
-        this.invincibleTimer = null;
-        this.invincibleGraceTimer = null;
-        this.invincibleColorTimer = null;
-        this.invincibleHeartTimer = null;
-        this.invinciblePulseTween = null;
-        this.invincibleGlowFx = null;
-        this.starSpawnBoostActive = false;
-        this.starSpawnBoostTimer = null;
-
         this.luvBombActive = false;
         this.luvBombTimer = null;
-        this.luvBombGlowFx = null;
-        this.luvBombPulseTween = null;
         this.luvBombShownAt = { 150: false, 500: false };
-        this.preLuvBombBackgroundKey = null;
+        this.luvBombDuration = 10000;
+        this.luvBombRainbowTimer = null;
+        this.luvBombMessageText = null;
+        this.luvBombMessageTween = null;
 
-        this.powerMessageText = null;
-        this.powerSubText = null;
-        this.powerMessageTween = null;
-        this.powerMessageColorTimer = null;
-
-        this.edgeGlowRects = [];
-        this.edgeGlowTween = null;
-
-        this.starAuraColors = [
-            0xff6ad5,
-            0xffff66,
-            0x7df9ff,
-            0xff9df2,
-            0xffffff,
-            0xb8ff6a
-        ];
-
-        this.messageFillColors = [
-            '#a82d67',
-            '#d95a3f',
-            '#e0b72d',
-            '#56b35c',
-            '#4aa6d9',
-            '#9a63d9'
-        ];
-
-        // new fairness / event system
-        this.specialEventActive = false;
-        this.specialEventType = null;
         this.specialEventCooldownUntil = 0;
-        this.pendingCinematicEvent = null;
-        this.eventScheduleHandles = [];
 
-        this.bonusLaneProtectionUntil = {};
-        this.laneNextSpawnTime = {};
+        this.activeCenterMessage = null;
+        this.activeLevelMessage = null;
+        this.pendingLevelMessage = null;
+
+        this.rainbowCycleColors = [
+            0xff4d6d,
+            0xffa94d,
+            0xfff06a,
+            0x7dff7d,
+            0x7df9ff,
+            0x9d8cff,
+            0xff8cf5
+        ];
 
         this.input.on('pointerdown', (pointer) => {
             this.retryActiveMusic();
@@ -241,8 +203,7 @@ export class Start extends Phaser.Scene {
     }
 
     getBaseShipTexture() {
-        if (this.luvBombActive) return 'Luvagirldrag';
-        return this.lives <= 1 ? 'Onelife' : 'LuvaGirl';
+        return this.luvBombActive ? 'Luvagirldrag' : (this.lives <= 1 ? 'Onelife' : 'LuvaGirl');
     }
 
     getBadShipTexture() {
@@ -256,16 +217,14 @@ export class Start extends Phaser.Scene {
     applyCurrentBaseShipTexture() {
         if (!this.ship || !this.ship.active) return;
 
-        if (this.invincibleVisibleActive) {
-            this.ship.setTexture(this.getBonusShipTexture());
-            this.ship.setScale(0.23);
-        } else {
-            this.ship.setTexture(this.getBaseShipTexture());
-            this.ship.setScale(0.22);
-        }
-
+        this.ship.setTexture(this.getBaseShipTexture());
+        this.ship.setScale(0.22);
         this.ship.angle = 0;
         this.ship.y = this.shipBaseY;
+
+        if (!this.luvBombActive) {
+            this.ship.clearTint();
+        }
     }
 
     createIntroGate() {
@@ -742,7 +701,6 @@ export class Start extends Phaser.Scene {
         if (this.gameStarted || this.isGameOver || this.gameCountdownActive || this.introGateActive) return;
         if (this.homePointerMoving) return;
         if (this.reactionTimer) return;
-        if (this.invincibleVisibleActive) return;
 
         if (this.ship && this.ship.active && this.ship.texture.key !== this.getBaseShipTexture()) {
             this.applyCurrentBaseShipTexture();
@@ -1009,7 +967,6 @@ export class Start extends Phaser.Scene {
         else if (this.heartsCaught < 200) delay = 560;
         else delay = 520;
 
-        if (this.starSpawnBoostActive) delay -= 120;
         if (this.luvBombActive) delay -= 220;
         if (this.chaosModeActive) delay -= 60;
 
@@ -1026,7 +983,6 @@ export class Start extends Phaser.Scene {
         else if (this.heartsCaught < 200) delay = 620;
         else delay = 580;
 
-        if (this.starSpawnBoostActive) delay -= 120;
         if (this.luvBombActive) delay -= 180;
         if (this.chaosModeActive) delay -= 50;
 
@@ -1042,160 +998,124 @@ export class Start extends Phaser.Scene {
         else if (this.heartsCaught < 200) total = 4;
         else total = 5;
 
-        if (this.starSpawnBoostActive) total += 1;
         if (this.luvBombActive) total += 3;
         if (this.chaosModeActive) total += 1;
 
         return Phaser.Math.Clamp(total, 1, 8);
     }
 
-    // -----------------------------
-    // Special Event / Fairness System
-    // -----------------------------
-
-    canRunSpecialEvent() {
-        return (
-            !this.isGameOver &&
-            this.gameStarted &&
-            !this.specialEventActive &&
-            !this.luvBombActive &&
-            !this.chaosModeActive &&
-            this.time.now >= this.specialEventCooldownUntil
-        );
+    isSpecialEventBlocked() {
+        return this.luvBombActive || this.time.now < this.specialEventCooldownUntil;
     }
 
-    scheduleCinematicEvent(type) {
-        if (this.pendingCinematicEvent || this.isGameOver) return;
-        if (this.specialEventActive) return;
-
-        this.pendingCinematicEvent = type;
-
-        const handle = this.time.delayedCall(Phaser.Math.Between(1200, 2800), () => {
-            if (this.isGameOver) return;
-            if (this.pendingCinematicEvent !== type) return;
-
-            if (type === 'lays') {
-                if (!this.firstLaysCinematicDone && this.heartsCaught >= 25 && this.heartsCaught <= 45 && this.canRunSpecialEvent()) {
-                    this.pendingCinematicEvent = null;
-                    this.triggerSpecialDescendEvent('lays');
-                }
-            } else if (type === 'grammy') {
-                if (!this.grammySpawned && !this.grammyCaught && this.heartsCaught >= 60 && this.heartsCaught <= 65 && this.canRunSpecialEvent()) {
-                    this.pendingCinematicEvent = null;
-                    this.triggerGrammyEvent();
-                }
-            } else if (type === 'star') {
-                if (!this.firstStarCinematicDone && this.heartsCaught >= 100 && this.heartsCaught <= 108 && this.canRunSpecialEvent()) {
-                    this.pendingCinematicEvent = null;
-                    this.triggerSpecialDescendEvent('star', 'first');
-                }
-            }
-        });
-
-        this.eventScheduleHandles.push(handle);
+    canShowLevelMessage() {
+        return !this.luvBombActive && !this.activeCenterMessage && !this.activeLevelMessage;
     }
 
-    beginSpecialEvent(type) {
-        this.specialEventActive = true;
-        this.specialEventType = type;
-
+    pauseSpawnTimers() {
         if (this.spawnTimer) this.spawnTimer.paused = true;
         if (this.extraSpawnTimer) this.extraSpawnTimer.paused = true;
     }
 
-    finishSpecialEvent() {
-        this.specialEventActive = false;
-        this.specialEventType = null;
-        this.specialEventCooldownUntil = this.time.now + Phaser.Math.Between(8000, 12000);
-
+    resumeSpawnTimers() {
         if (this.spawnTimer) this.spawnTimer.paused = false;
         if (this.extraSpawnTimer) this.extraSpawnTimer.paused = false;
     }
 
-    getPlayerLaneIndex() {
-        let closestIndex = 0;
-        let closestDist = Number.MAX_SAFE_INTEGER;
-
-        for (let i = 0; i < this.spawnLanes.length; i++) {
-            const dist = Math.abs(this.spawnLanes[i] - this.ship.x);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closestIndex = i;
-            }
+    queueOrShowLevelMessage(text) {
+        if (this.canShowLevelMessage()) {
+            this.showLevelMessage(text);
+        } else {
+            this.pendingLevelMessage = text;
         }
-
-        return closestIndex;
     }
 
-    getLaneDangerScore(laneIndex) {
-        let score = 0;
-
-        this.items.children.iterate((item) => {
-            if (!item || !item.active) return;
-            if (item.laneIndex !== laneIndex) return;
-
-            if (item.itemType === 'tomato') {
-                if (item.y > this.catchZoneY - 220 && item.y < this.catchZoneBottom + 30) score += 5;
-                else if (item.y < this.catchZoneY - 220 && item.y > -150) score += 2;
-            } else {
-                if (item.y > this.catchZoneY - 180 && item.y < this.catchZoneBottom + 20) score += 1;
-            }
-        });
-
-        return score;
-    }
-
-    getSafeLaneIndexes() {
-        const laneScores = this.spawnLanes.map((_, index) => {
-            const danger = this.getLaneDangerScore(index);
-            const distancePenalty = Math.abs(index - this.getPlayerLaneIndex()) * 0.55;
-            return {
-                index,
-                score: danger + distancePenalty
-            };
-        });
-
-        laneScores.sort((a, b) => a.score - b.score);
-        const safest = laneScores[0] ? laneScores[0].index : this.centerLaneIndex;
-
-        const safeLaneSet = new Set([safest]);
-
-        if (this.starProtectedLane !== null) {
-            safeLaneSet.add(this.starProtectedLane);
-        }
-
-        return Array.from(safeLaneSet);
-    }
-
-    clearSpaceForEvent(centerLaneIndex = this.centerLaneIndex) {
-        const safeWidth = 34;
-
+    clearAllFallingItems() {
         this.items.children.iterate((item) => {
             if (!item || !item.active) return;
 
-            const sameCenterLane = item.laneIndex === centerLaneIndex;
-            const nearCenterX = Math.abs(item.x - this.spawnLanes[centerLaneIndex]) < safeWidth;
+            if (item.glowSprite && item.glowSprite.active) {
+                item.glowSprite.destroy();
+            }
 
-            if ((sameCenterLane || nearCenterX) && item.y < 250) {
+            item.destroy();
+        });
+    }
+
+    burstRemainingHeartsIntoSparkles() {
+        this.items.children.iterate((item) => {
+            if (!item || !item.active) return;
+            if (item.itemType !== 'heart') return;
+
+            for (let i = 0; i < 4; i++) {
+                const sparkle = this.add.text(
+                    item.x + Phaser.Math.Between(-12, 12),
+                    item.y + Phaser.Math.Between(-12, 12),
+                    '✨',
+                    { fontSize: '16px' }
+                ).setOrigin(0.5).setDepth(2600);
+
+                this.tweens.add({
+                    targets: sparkle,
+                    x: sparkle.x + Phaser.Math.Between(-18, 18),
+                    y: sparkle.y + Phaser.Math.Between(-18, 18),
+                    alpha: 0,
+                    scale: 1.2,
+                    duration: 350,
+                    onComplete: () => sparkle.destroy()
+                });
+            }
+        });
+    }
+
+    startLuvBombRainbowEffect() {
+        if (this.luvBombRainbowTimer) {
+            this.luvBombRainbowTimer.remove(false);
+            this.luvBombRainbowTimer = null;
+        }
+
+        if (!this.ship || !this.ship.active) return;
+
+        let colorIndex = 0;
+
+        this.luvBombRainbowTimer = this.time.addEvent({
+            delay: 90,
+            loop: true,
+            callback: () => {
+                if (!this.ship || !this.ship.active || !this.luvBombActive) return;
+                this.ship.setTint(this.rainbowCycleColors[colorIndex]);
+                colorIndex = (colorIndex + 1) % this.rainbowCycleColors.length;
+            }
+        });
+    }
+
+    stopLuvBombRainbowEffect() {
+        if (this.luvBombRainbowTimer) {
+            this.luvBombRainbowTimer.remove(false);
+            this.luvBombRainbowTimer = null;
+        }
+
+        if (this.ship && this.ship.active) {
+            this.ship.clearTint();
+        }
+    }
+
+    triggerGrammyEvent() {
+        if (this.isGameOver || this.grammySpawned || this.grammyCaught || this.isSpecialEventBlocked()) return;
+
+        this.pauseSpawnTimers();
+
+        const dim = this.add.rectangle(180, 320, 360, 640, 0x000000, 0.35).setDepth(2200);
+
+        this.items.children.iterate((item) => {
+            if (!item) return;
+            if (item.y < 200) {
                 if (item.glowSprite && item.glowSprite.active) item.glowSprite.destroy();
                 item.destroy();
             }
         });
 
-        this.bonusLaneProtectionUntil[centerLaneIndex] = this.time.now + 2600;
-        this.laneNextSpawnTime[centerLaneIndex] = this.time.now + 650;
-    }
-
-    triggerGrammyEvent() {
-        if (this.isGameOver || this.grammySpawned || this.grammyCaught) return;
-        if (!this.canRunSpecialEvent()) return;
-
-        this.beginSpecialEvent('grammy');
-        this.clearSpaceForEvent(this.centerLaneIndex);
-
-        const dim = this.add.rectangle(180, 320, 360, 640, 0x000000, 0.35).setDepth(2200);
-
-        const grammy = this.add.image(this.spawnLanes[this.centerLaneIndex], -88, 'grammy').setScale(0.32).setDepth(2300);
+        const grammy = this.add.image(180, -60, 'grammy').setScale(0.32).setDepth(2300);
 
         grammy.itemKind = 'bonus';
         grammy.itemValue = 10;
@@ -1209,8 +1129,7 @@ export class Start extends Phaser.Scene {
         grammy.pulseAmount = 0.03;
         grammy.pulseTime = 0;
         grammy.safePassed = false;
-        grammy.laneIndex = this.centerLaneIndex;
-        grammy.eventItem = true;
+        grammy.laneIndex = 3;
 
         this.grammySpawned = true;
 
@@ -1245,73 +1164,51 @@ export class Start extends Phaser.Scene {
                 duration: 300,
                 onComplete: () => dim.destroy()
             });
-            this.finishSpecialEvent();
+
+            this.resumeSpawnTimers();
         });
     }
 
-    triggerSpecialDescendEvent(type, starThreshold = null) {
-        if (this.isGameOver) return;
-        if (!this.canRunSpecialEvent()) return;
+    triggerSpecialDescendEvent(type) {
+        if (this.isGameOver || this.isSpecialEventBlocked()) return;
+        if (type !== 'lays') return;
 
-        this.beginSpecialEvent(type);
-        this.clearSpaceForEvent(this.centerLaneIndex);
+        this.pauseSpawnTimers();
 
         const dim = this.add.rectangle(180, 320, 360, 640, 0x000000, 0.33).setAlpha(0.95).setDepth(2200);
 
-        let item = null;
+        this.items.children.iterate((item) => {
+            if (!item || !item.active) return;
+            if (item.y < 200) {
+                if (item.glowSprite && item.glowSprite.active) item.glowSprite.destroy();
+                item.destroy();
+            }
+        });
 
-        if (type === 'star') {
-            item = this.add.image(this.spawnLanes[this.centerLaneIndex], -88, 'starItem').setScale(0.24).setDepth(2300);
-            item.itemKind = 'power';
-            item.itemValue = 0;
-            item.itemType = 'star';
-            item.starThreshold = starThreshold;
-            item.speed = Math.max(2, this.currentFallSpeed * 0.55);
-            item.catchWidth = 40;
-            item.catchHeight = 40;
-            item.angleSpeed = 2.8;
-            item.baseScale = 0.24;
-            item.pulseSpeed = 0.24;
-            item.pulseAmount = 0.04;
-            item.pulseTime = 0;
-            item.safePassed = false;
-            item.laneIndex = this.centerLaneIndex;
-            item.eventItem = true;
-            this.starProtectedLane = this.centerLaneIndex;
-            this.addGoldenGlow(item);
-            this.firstStarCinematicDone = true;
-            this.starPowerSpawnedAt.first = true;
-        }
+        const item = this.add.image(180, -60, 'laysItem').setScale(0.22).setDepth(2300);
+        item.itemKind = 'life';
+        item.itemValue = 1;
+        item.itemType = 'lays';
+        item.speed = Math.max(2, this.currentFallSpeed * 0.55);
+        item.catchWidth = 38;
+        item.catchHeight = 36;
+        item.angleSpeed = 0.18;
+        item.baseScale = 0.22;
+        item.pulseSpeed = 0.12;
+        item.pulseAmount = 0.02;
+        item.pulseTime = 0;
+        item.safePassed = false;
+        item.laneIndex = 3;
 
-        if (type === 'lays') {
-            item = this.add.image(this.spawnLanes[this.centerLaneIndex], -88, 'laysItem').setScale(0.22).setDepth(2300);
-            item.itemKind = 'life';
-            item.itemValue = 1;
-            item.itemType = 'lays';
-            item.speed = Math.max(2, this.currentFallSpeed * 0.55);
-            item.catchWidth = 38;
-            item.catchHeight = 36;
-            item.angleSpeed = 0.18;
-            item.baseScale = 0.22;
-            item.pulseSpeed = 0.12;
-            item.pulseAmount = 0.02;
-            item.pulseTime = 0;
-            item.safePassed = false;
-            item.laneIndex = this.centerLaneIndex;
-            item.eventItem = true;
-            this.addSoftLifeGlow(item);
-            this.firstLaysCinematicDone = true;
-        }
-
-        if (!item) return;
-
+        this.addSoftLifeGlow(item);
+        this.firstLaysCinematicDone = true;
         this.items.add(item);
 
         for (let i = 0; i < 10; i++) {
             const sparkle = this.add.text(
                 180 + Phaser.Math.Between(-40, 40),
                 Phaser.Math.Between(40, 120),
-                type === 'star' ? '⭐' : '💖',
+                '💖',
                 { fontSize: '18px' }
             ).setOrigin(0.5).setDepth(2300);
 
@@ -1332,7 +1229,8 @@ export class Start extends Phaser.Scene {
                 duration: 300,
                 onComplete: () => dim.destroy()
             });
-            this.finishSpecialEvent();
+
+            this.resumeSpawnTimers();
         });
     }
 
@@ -1346,7 +1244,7 @@ export class Start extends Phaser.Scene {
             stroke: '#ff69b4',
             strokeThickness: 2,
             shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 8, fill: true }
-        }).setOrigin(0.5, 0).setDepth(2600);
+        }).setOrigin(0.5, 0);
 
         this.heartsNumberText = this.add.text(180, 24, '0', {
             fontSize: '20px',
@@ -1354,14 +1252,14 @@ export class Start extends Phaser.Scene {
             stroke: '#ff69b4',
             strokeThickness: 2,
             shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 8, fill: true }
-        }).setOrigin(0.5, 0).setDepth(2600);
+        }).setOrigin(0.5, 0);
 
         this.highScoreText = this.add.text(180, 46, `Best: ${this.highScore}`, {
             fontSize: '12px',
-            color: '#ffffff',
-            stroke: '#ff69b4',
+            color: '#4b1e6d',
+            stroke: '#d8b4ff',
             strokeThickness: 2
-        }).setOrigin(0.5, 0).setDepth(2600);
+        }).setOrigin(0.5, 0);
 
         this.createLifeIcons();
 
@@ -1373,7 +1271,7 @@ export class Start extends Phaser.Scene {
             stroke: '#ff69b4',
             strokeThickness: 1,
             shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 8, fill: true }
-        }).setOrigin(0, 0).setAlpha(0.88).setInteractive({ useHandCursor: true }).setDepth(2600);
+        }).setOrigin(0, 0).setAlpha(0.88).setInteractive({ useHandCursor: true });
 
         this.endGameButton.on('pointerdown', () => {
             this.endGame();
@@ -1389,30 +1287,29 @@ export class Start extends Phaser.Scene {
     }
 
     getLifeIconPosition(index) {
-        const startX = 276;
+        const startX = 288;
         const startY = 18;
-        const itemSpacingX = 22;
-        const itemSpacingY = 22;
-        const maxPerRow = 4;
+        const colSpacing = 18;
+        const rowSpacing = 18;
+        const maxCols = 4;
 
-        const col = index % maxPerRow;
-        const row = Math.floor(index / maxPerRow);
+        const col = index % maxCols;
+        const row = Math.floor(index / maxCols);
 
         return {
-            x: startX + (col * itemSpacingX),
-            y: startY + (row * itemSpacingY)
+            x: startX + (col * colSpacing),
+            y: startY + (row * rowSpacing)
         };
     }
 
     createLifeIcons() {
         this.lifeIcons = [];
 
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < this.lives; i++) {
             const pos = this.getLifeIconPosition(i);
             const icon = this.add.image(pos.x, pos.y, 'lifeFull')
-                .setScale(0.2)
-                .setOrigin(0.5, 0.5)
-                .setDepth(2600);
+                .setScale(0.18)
+                .setOrigin(0.5, 0.5);
 
             this.lifeIcons.push(icon);
         }
@@ -1422,27 +1319,41 @@ export class Start extends Phaser.Scene {
         while (this.lifeIcons.length < this.lives) {
             const pos = this.getLifeIconPosition(this.lifeIcons.length);
             const icon = this.add.image(pos.x, pos.y, 'lifeFull')
-                .setScale(0.1)
-                .setOrigin(0.5, 0.5)
-                .setDepth(2600);
+                .setScale(0.08)
+                .setOrigin(0.5, 0.5);
 
             this.lifeIcons.push(icon);
 
             this.tweens.add({
                 targets: icon,
-                scale: { from: 0.1, to: 0.2 },
+                scale: { from: 0.08, to: 0.18 },
                 duration: 180,
                 ease: 'Back.Out'
             });
         }
 
-        for (let i = 0; i < this.lifeIcons.length; i++) {
-            if (i < this.lives) {
-                this.lifeIcons[i].setTexture('lifeFull');
-            } else {
-                this.lifeIcons[i].setTexture('lifeLost');
-            }
+        while (this.lifeIcons.length > this.lives) {
+            const icon = this.lifeIcons.pop();
+
+            this.tweens.add({
+                targets: icon,
+                scale: 0,
+                alpha: 0,
+                duration: 140,
+                ease: 'Power2',
+                onComplete: () => {
+                    if (icon && icon.active) icon.destroy();
+                }
+            });
         }
+
+        this.lifeIcons.forEach((icon, index) => {
+            const pos = this.getLifeIconPosition(index);
+            icon.setPosition(pos.x, pos.y);
+            icon.setTexture('lifeFull');
+            icon.setScale(0.18);
+            icon.setAlpha(1);
+        });
 
         if (!this.reactionTimer && this.ship && this.ship.active && !this.isGameOver) {
             this.applyCurrentBaseShipTexture();
@@ -1504,9 +1415,9 @@ export class Start extends Phaser.Scene {
                 item.safePassed = true;
             }
 
-            if (item.y > this.gameHeight + 50) {
-                if (item.itemType === 'star' && this.starProtectedLane === item.laneIndex) {
-                    this.starProtectedLane = null;
+            if (item.y > this.gameHeight + 70) {
+                if (item.itemType === 'grammy') {
+                    this.grammySpawned = true;
                 }
 
                 if (item.glowSprite && item.glowSprite.active) {
@@ -1530,6 +1441,13 @@ export class Start extends Phaser.Scene {
         });
 
         this.checkLevelProgress();
+    }
+
+    getSafeLaneIndexes() {
+        const safeLaneSet = new Set();
+        const randomSafeLane = Phaser.Math.Between(0, this.spawnLanes.length - 1);
+        safeLaneSet.add(randomSafeLane);
+        return Array.from(safeLaneSet);
     }
 
     getAvailableAlternateLane(excludedLaneIndexes = [], itemY = 0) {
@@ -1563,42 +1481,31 @@ export class Start extends Phaser.Scene {
         return null;
     }
 
-    getSpawnY() {
-        return -Phaser.Math.Between(50, 120);
-    }
-
-    laneHasVerticalConflict(laneIndex, spawnY, minGap = 95) {
-        let blocked = false;
+    clearDangerFromSafeLanes(safeLaneIndexes = []) {
+        const dangerTop = this.catchZoneY - 140;
+        const dangerBottom = this.catchZoneBottom + 40;
 
         this.items.children.iterate((item) => {
             if (!item || !item.active) return;
-            if (item.laneIndex !== laneIndex) return;
-            if (Math.abs(item.y - spawnY) < minGap) blocked = true;
-        });
+            if (typeof item.laneIndex !== 'number') return;
+            if (!safeLaneIndexes.includes(item.laneIndex)) return;
+            if (item.y < dangerTop || item.y > dangerBottom) return;
 
-        return blocked;
+            const newLane = this.getAvailableAlternateLane(safeLaneIndexes, item.y);
+            if (newLane === null) return;
+
+            item.laneIndex = newLane;
+            item.x = this.spawnLanes[newLane];
+        });
     }
 
     getSpawnX(type, usedLaneIndexes = [], blockedLaneIndexes = []) {
-        const now = this.time.now;
-        const spawnY = this.getSpawnY();
-
         let availableLaneIndexes = this.spawnLanes
             .map((_, index) => index)
-            .filter((index) => !usedLaneIndexes.includes(index))
-            .filter((index) => !this.laneHasVerticalConflict(index, spawnY, 95))
-            .filter((index) => now >= (this.laneNextSpawnTime[index] || 0));
+            .filter((index) => !usedLaneIndexes.includes(index));
 
         if (type === 'tomato') {
             availableLaneIndexes = availableLaneIndexes.filter((index) => !blockedLaneIndexes.includes(index));
-            availableLaneIndexes = availableLaneIndexes.filter((index) => now >= (this.bonusLaneProtectionUntil[index] || 0));
-
-            if (this.lastTomatoLane !== null) {
-                const filteredByDistance = availableLaneIndexes.filter((index) => Math.abs(index - this.lastTomatoLane) >= 1);
-                if (filteredByDistance.length > 0) {
-                    availableLaneIndexes = filteredByDistance;
-                }
-            }
         } else {
             if (this.lastSpawnLane !== null) {
                 const filteredNoRepeat = availableLaneIndexes.filter((index) => index !== this.lastSpawnLane);
@@ -1614,13 +1521,15 @@ export class Start extends Phaser.Scene {
                 .filter((index) => !usedLaneIndexes.includes(index));
 
             if (type === 'tomato') {
-                availableLaneIndexes = availableLaneIndexes.filter((index) => !blockedLaneIndexes.includes(index));
-                availableLaneIndexes = availableLaneIndexes.filter((index) => now >= (this.bonusLaneProtectionUntil[index] || 0));
+                const relaxedSafeFilter = availableLaneIndexes.filter((index) => !blockedLaneIndexes.includes(index));
+                if (relaxedSafeFilter.length > 0) {
+                    availableLaneIndexes = relaxedSafeFilter;
+                }
             }
         }
 
         if (availableLaneIndexes.length === 0) {
-            return null;
+            availableLaneIndexes = this.spawnLanes.map((_, index) => index);
         }
 
         const laneIndex = Phaser.Utils.Array.GetRandom(availableLaneIndexes);
@@ -1630,11 +1539,11 @@ export class Start extends Phaser.Scene {
 
         if (type === 'tomato') {
             this.lastTomatoLane = laneIndex;
-        } else {
+        } else if (type !== 'grammy') {
             this.lastTomatoLane = null;
         }
 
-        return { x, laneIndex, y: spawnY };
+        return { x, laneIndex };
     }
 
     getMaxTomatoesPerWave() {
@@ -1646,23 +1555,51 @@ export class Start extends Phaser.Scene {
         else if (this.heartsCaught < 60) max = 1;
         else max = 2;
 
-        if (this.starSpawnBoostActive) max += 1;
-
         return max;
     }
 
     spawnWave(count = 2) {
         if (this.isGameOver || !this.gameStarted) return;
-        if (this.specialEventActive) return;
 
         const usedLaneIndexes = [];
         const safeLaneIndexes = this.getSafeLaneIndexes();
         const spawnCount = Math.max(1, count);
 
+        this.clearDangerFromSafeLanes(safeLaneIndexes);
+
         const maxTomatoesThisWave = this.getMaxTomatoesPerWave();
         let tomatoCountThisWave = 0;
 
-        this.trySpawnPendingNormalThresholdItem(usedLaneIndexes, safeLaneIndexes);
+        if (this.laysForcedSpawnPending && !this.isSpecialEventBlocked()) {
+            if (!this.firstLaysCinematicDone) {
+                this.laysForcedSpawnPending = false;
+                this.laysRegularSpawnConsumed = true;
+                this.triggerSpecialDescendEvent('lays');
+                return;
+            } else {
+                const forcedLays = this.spawnSpecificItem('lays', usedLaneIndexes, safeLaneIndexes);
+                if (forcedLays && typeof forcedLays.laneIndex === 'number') {
+                    usedLaneIndexes.push(forcedLays.laneIndex);
+                    this.laysForcedSpawnPending = false;
+                    if (!this.chaosModeActive) this.laysRegularSpawnConsumed = true;
+                }
+            }
+        }
+
+        if (
+            this.grammyForcedSpawnPending &&
+            this.grammyUnlocked &&
+            !this.grammySpawned &&
+            !this.grammyCaught &&
+            !this.chaosModeActive &&
+            !this.isSpecialEventBlocked()
+        ) {
+            const forcedGrammy = this.spawnSpecificItem('grammy', usedLaneIndexes, safeLaneIndexes);
+            if (forcedGrammy && typeof forcedGrammy.laneIndex === 'number') {
+                usedLaneIndexes.push(forcedGrammy.laneIndex);
+            }
+            this.grammyForcedSpawnPending = false;
+        }
 
         for (let i = usedLaneIndexes.length; i < spawnCount; i++) {
             let type = this.chooseItemType();
@@ -1683,25 +1620,6 @@ export class Start extends Phaser.Scene {
         }
     }
 
-    trySpawnPendingNormalThresholdItem(usedLaneIndexes = [], safeLaneIndexes = []) {
-        if (!this.pendingNormalThresholdSpawns.length) return;
-        if (this.specialEventActive || this.luvBombActive) return;
-
-        const next = this.pendingNormalThresholdSpawns[0];
-        if (!next) return;
-
-        const created = this.spawnSpecificItem(next.type, usedLaneIndexes, safeLaneIndexes, next.threshold);
-
-        if (created && typeof created.laneIndex === 'number') {
-            usedLaneIndexes.push(created.laneIndex);
-
-            if (next.type === 'lays') this.laysSpawnedAt[next.threshold] = true;
-            if (next.type === 'star') this.starPowerSpawnedAt[next.threshold] = true;
-
-            this.pendingNormalThresholdSpawns.shift();
-        }
-    }
-
     addPurpleGlow(item) {
         if (!item) return;
 
@@ -1719,28 +1637,6 @@ export class Start extends Phaser.Scene {
             .setScale(item.scale * 1.42)
             .setAlpha(0.32)
             .setTint(0xe9cbff);
-
-        glow.setDepth(item.depth - 1);
-        item.glowSprite = glow;
-    }
-
-    addGoldenGlow(item) {
-        if (!item) return;
-
-        if (item.preFX) {
-            item.preFX.addGlow(0xfff27a, 14, 0, false, 0.22, 22);
-            return;
-        }
-
-        if (item.postFX) {
-            item.postFX.addGlow(0xfff27a, 0.9, 0, false, 0.22, 22);
-            return;
-        }
-
-        const glow = this.add.image(item.x, item.y, item.texture.key)
-            .setScale(item.scale * 1.6)
-            .setAlpha(0.38)
-            .setTint(0xfff4a3);
 
         glow.setDepth(item.depth - 1);
         item.glowSprite = glow;
@@ -1768,38 +1664,26 @@ export class Start extends Phaser.Scene {
         item.glowSprite = glow;
     }
 
-    protectBonusLane(laneIndex, duration = 1300) {
-        const until = this.time.now + duration;
-        this.bonusLaneProtectionUntil[laneIndex] = until;
-        this.laneNextSpawnTime[laneIndex] = Math.max(this.laneNextSpawnTime[laneIndex] || 0, this.time.now + 420);
-    }
-
-    spawnSpecificItem(type, usedLaneIndexes = [], safeLaneIndexes = [], threshold = null) {
+    spawnSpecificItem(type, usedLaneIndexes = [], safeLaneIndexes = []) {
         if (this.isGameOver) return null;
 
-        if (type === 'grammy' && (!this.grammyUnlocked || this.grammySpawned || this.grammyCaught || this.chaosModeActive)) {
+        if (type === 'grammy' && (!this.grammyUnlocked || this.grammySpawned || this.grammyCaught || this.chaosModeActive || this.isSpecialEventBlocked())) {
             return null;
         }
 
-        if (type === 'star' && this.chaosModeActive) {
+        if (type === 'lays' && (!this.cache.image.exists('laysItem') || this.isSpecialEventBlocked())) {
             return null;
         }
 
-        const blockedLaneIndexes = type === 'tomato'
-            ? [...safeLaneIndexes, ...(this.starProtectedLane !== null ? [this.starProtectedLane] : [])]
-            : [];
-
+        const blockedLaneIndexes = type === 'tomato' ? [...safeLaneIndexes] : [];
         const spawnData = this.getSpawnX(type, usedLaneIndexes, blockedLaneIndexes);
-        if (!spawnData) return null;
-
         const x = spawnData.x;
-        const y = spawnData.y;
 
         let item = null;
 
         if (type === 'heart') {
             const randomHeart = Phaser.Utils.Array.GetRandom(this.heartKeys);
-            item = this.add.image(x, y, randomHeart).setScale(0.24);
+            item = this.add.image(x, -34, randomHeart).setScale(0.24);
             item.itemKind = 'good';
             item.itemValue = this.luvBombActive ? 2 : 1;
             item.itemType = 'heart';
@@ -1813,7 +1697,7 @@ export class Start extends Phaser.Scene {
         }
 
         if (type === 'tomato') {
-            item = this.add.image(x, y, 'tomato').setScale(0.23);
+            item = this.add.image(x, -34, 'tomato').setScale(0.23);
             item.itemKind = 'bad';
             item.itemValue = 1;
             item.itemType = 'tomato';
@@ -1827,7 +1711,7 @@ export class Start extends Phaser.Scene {
         }
 
         if (type === 'ramen') {
-            item = this.add.image(x, y, 'ramenItem').setScale(0.22);
+            item = this.add.image(x, -34, 'ramenItem').setScale(0.22);
             item.itemKind = 'good';
             item.itemValue = 4;
             item.itemType = 'ramen';
@@ -1840,11 +1724,10 @@ export class Start extends Phaser.Scene {
             item.laneIndex = spawnData.laneIndex;
             this.ramenSpawnCount += 1;
             this.addPurpleGlow(item);
-            this.protectBonusLane(item.laneIndex, 1200);
         }
 
         if (type === 'music') {
-            item = this.add.image(x, y, 'noteItem').setScale(0.22);
+            item = this.add.image(x, -34, 'noteItem').setScale(0.22);
             item.itemKind = 'good';
             item.itemValue = 4;
             item.itemType = 'music';
@@ -1857,15 +1740,14 @@ export class Start extends Phaser.Scene {
             item.laneIndex = spawnData.laneIndex;
             this.musicSpawnCount += 1;
             this.addPurpleGlow(item);
-            this.protectBonusLane(item.laneIndex, 1200);
         }
 
         if (type === 'grammy') {
-            item = this.add.image(x, y, 'grammy').setScale(0.3);
+            item = this.add.image(x, -38, 'grammy').setScale(0.3);
             item.itemKind = 'bonus';
             item.itemValue = 10;
             item.itemType = 'grammy';
-            item.speed = Math.max(2, this.currentFallSpeed * 0.55);
+            item.speed = this.currentFallSpeed;
             item.catchWidth = 40;
             item.catchHeight = 40;
             item.angleSpeed = 0.35;
@@ -1876,7 +1758,6 @@ export class Start extends Phaser.Scene {
             item.safePassed = false;
             item.laneIndex = spawnData.laneIndex;
             this.grammySpawned = true;
-            this.protectBonusLane(item.laneIndex, 1600);
 
             if (item.preFX) {
                 item.preFX.addGlow(0x8fdcff, 10, 0, false, 0.15, 16);
@@ -1884,11 +1765,10 @@ export class Start extends Phaser.Scene {
         }
 
         if (type === 'lays') {
-            item = this.add.image(x, y, 'laysItem').setScale(0.22);
+            item = this.add.image(x, -34, 'laysItem').setScale(0.22);
             item.itemKind = 'life';
             item.itemValue = 1;
             item.itemType = 'lays';
-            item.spawnThreshold = threshold;
             item.speed = this.currentFallSpeed;
             item.catchWidth = 38;
             item.catchHeight = 36;
@@ -1900,33 +1780,9 @@ export class Start extends Phaser.Scene {
             item.safePassed = false;
             item.laneIndex = spawnData.laneIndex;
             this.addSoftLifeGlow(item);
-            this.protectBonusLane(item.laneIndex, 1500);
-        }
-
-        if (type === 'star') {
-            item = this.add.image(x, y, 'starItem').setScale(0.22);
-            item.itemKind = 'power';
-            item.itemValue = 0;
-            item.itemType = 'star';
-            item.starThreshold = threshold;
-            item.speed = Math.max(2, this.currentFallSpeed * 0.55);
-            item.catchWidth = 38;
-            item.catchHeight = 38;
-            item.angleSpeed = 2.8;
-            item.baseScale = 0.22;
-            item.pulseSpeed = 0.24;
-            item.pulseAmount = 0.04;
-            item.pulseTime = Phaser.Math.FloatBetween(0, Math.PI * 2);
-            item.safePassed = false;
-            item.laneIndex = spawnData.laneIndex;
-            this.starProtectedLane = spawnData.laneIndex;
-            this.addGoldenGlow(item);
-            this.protectBonusLane(item.laneIndex, 1800);
         }
 
         if (!item) return null;
-
-        this.laneNextSpawnTime[item.laneIndex] = this.time.now + Phaser.Math.Between(300, 600);
 
         this.lastSpawnType = type;
         this.items.add(item);
@@ -1939,43 +1795,48 @@ export class Start extends Phaser.Scene {
 
     getSpawnWeights() {
         if (this.luvBombActive) {
-            return { heart: 100, tomato: 0, ramen: 0, music: 0, grammy: 0, lays: 0, star: 0 };
+            return { heart: 100, tomato: 0, ramen: 0, music: 0, grammy: 0 };
         }
 
         if (this.chaosModeActive) {
-            return { heart: 54, tomato: 46, ramen: 0, music: 0, grammy: 0, lays: 2, star: 0 };
+            return { heart: 54, tomato: 46, ramen: 0, music: 0, grammy: 0 };
         }
 
         if (this.heartsCaught < 5) {
-            return { heart: 100, tomato: 0, ramen: 0, music: 0, grammy: 0, lays: 0, star: 0 };
+            return { heart: 100, tomato: 0, ramen: 0, music: 0, grammy: 0 };
         }
 
         if (this.heartsCaught < 15) {
-            return { heart: 80, tomato: 20, ramen: 0, music: 0, grammy: 0, lays: 0, star: 0 };
+            return { heart: 80, tomato: 20, ramen: 0, music: 0, grammy: 0 };
         }
 
         if (this.heartsCaught < 30) {
-            return { heart: 70, tomato: 24, ramen: 3, music: 3, grammy: 0, lays: 0, star: 0 };
+            return { heart: 70, tomato: 24, ramen: 3, music: 3, grammy: 0 };
         }
 
         if (this.heartsCaught < 60) {
-            return { heart: 58, tomato: 34, ramen: 4, music: 4, grammy: 0, lays: 0, star: 0 };
+            return { heart: 58, tomato: 34, ramen: 4, music: 4, grammy: 0 };
         }
 
         if (this.heartsCaught < 100) {
-            return { heart: 43, tomato: 48, ramen: 5, music: 4, grammy: 0, lays: 0, star: 0 };
+            return { heart: 43, tomato: 46, ramen: 5, music: 4, grammy: 2 };
         }
 
         if (this.heartsCaught < 200) {
-            return { heart: 40, tomato: 48, ramen: 5, music: 5, grammy: 0, lays: 0, star: 0 };
+            return { heart: 40, tomato: 48, ramen: 5, music: 5, grammy: 2 };
         }
 
-        return { heart: 38, tomato: 50, ramen: 5, music: 5, grammy: 0, lays: 0, star: 0 };
+        return { heart: 38, tomato: 50, ramen: 5, music: 5, grammy: 2 };
     }
 
     chooseItemType() {
         const weights = this.getSpawnWeights();
-        const total = weights.heart + weights.tomato + weights.ramen + weights.music + weights.grammy + weights.lays + weights.star;
+
+        if (!this.grammyUnlocked || this.grammySpawned || this.grammyCaught || this.chaosModeActive || this.isSpecialEventBlocked()) {
+            weights.grammy = 0;
+        }
+
+        const total = weights.heart + weights.tomato + weights.ramen + weights.music + weights.grammy;
 
         if (total <= 0) return 'heart';
 
@@ -1991,63 +1852,27 @@ export class Start extends Phaser.Scene {
         roll -= weights.ramen;
 
         if (roll <= weights.music) return 'music';
-        roll -= weights.music;
 
-        if (roll <= weights.grammy) return 'grammy';
-        roll -= weights.grammy;
-
-        if (roll <= weights.lays) return 'lays';
-
-        return 'star';
-    }
-
-    maybeQueueLaterThresholdDrops() {
-        for (let i = 0; i < this.laysLaterThresholds.length; i++) {
-            const threshold = this.laysLaterThresholds[i];
-            if (this.heartsCaught >= threshold && !this.laysSpawnedAt[threshold]) {
-                const exists = this.pendingNormalThresholdSpawns.some((e) => e.type === 'lays' && e.threshold === threshold);
-                if (!exists) {
-                    this.pendingNormalThresholdSpawns.push({ type: 'lays', threshold });
-                }
-            }
-        }
-
-        for (let i = 0; i < this.starLaterThresholds.length; i++) {
-            const threshold = this.starLaterThresholds[i];
-            if (this.heartsCaught >= threshold && !this.starPowerSpawnedAt[threshold] && !this.starPowerCaughtAt[threshold]) {
-                const exists = this.pendingNormalThresholdSpawns.some((e) => e.type === 'star' && e.threshold === threshold);
-                if (!exists) {
-                    this.pendingNormalThresholdSpawns.push({ type: 'star', threshold });
-                }
-            }
-        }
+        return 'grammy';
     }
 
     maybeQueueLays() {
-        if (this.heartsCaught >= 25 && this.heartsCaught <= 45 && !this.firstLaysCinematicDone) {
-            this.scheduleCinematicEvent('lays');
+        if (this.isSpecialEventBlocked()) return;
+
+        if (this.heartsCaught >= 100 && !this.laysUnlocked) {
+            this.laysUnlocked = true;
+
+            this.time.delayedCall(2600, () => {
+                if (this.isGameOver || this.chaosModeActive || this.laysRegularSpawnConsumed || this.laysForcedSpawnPending || this.isSpecialEventBlocked()) return;
+                this.laysForcedSpawnPending = true;
+            });
         }
 
-        this.maybeQueueLaterThresholdDrops();
-    }
-
-    maybeQueueStarPowerup() {
-        if (this.heartsCaught >= 100 && this.heartsCaught <= 108 && !this.firstStarCinematicDone) {
-            this.scheduleCinematicEvent('star');
-        }
-
-        this.maybeQueueLaterThresholdDrops();
-    }
-
-    maybeQueueGrammy() {
-        if (
-            this.grammyUnlocked &&
-            !this.grammySpawned &&
-            !this.grammyCaught &&
-            this.heartsCaught >= 60 &&
-            this.heartsCaught <= 65
-        ) {
-            this.scheduleCinematicEvent('grammy');
+        if (this.chaosModeActive) {
+            if (this.heartsCaught >= this.nextChaosLaysAt && !this.laysForcedSpawnPending && !this.isSpecialEventBlocked()) {
+                this.laysForcedSpawnPending = true;
+                this.nextChaosLaysAt += 150;
+            }
         }
     }
 
@@ -2072,12 +1897,6 @@ export class Start extends Phaser.Scene {
         const x = item.x;
         const y = item.y;
         const itemType = item.itemType;
-        const starThreshold = item.starThreshold;
-        const spawnThreshold = item.spawnThreshold;
-
-        if (itemType === 'star' && this.starProtectedLane === item.laneIndex) {
-            this.starProtectedLane = null;
-        }
 
         if (item.glowSprite && item.glowSprite.active) {
             item.glowSprite.destroy();
@@ -2116,9 +1935,7 @@ export class Start extends Phaser.Scene {
                 this.showFloatingScore('+1');
             }
 
-            this.maybeQueueStarPowerup();
             this.maybeQueueLays();
-            this.maybeQueueGrammy();
             this.maybeTriggerLuvBomb();
             return;
         }
@@ -2138,7 +1955,6 @@ export class Start extends Phaser.Scene {
             this.showPlayerReaction('bonus');
             this.triggerVibration([80, 40, 120]);
 
-            this.maybeQueueStarPowerup();
             this.maybeQueueLays();
             this.maybeTriggerLuvBomb();
             return;
@@ -2150,38 +1966,12 @@ export class Start extends Phaser.Scene {
             this.lives += value;
             this.updateLivesDisplay();
             this.showGrammySparkles(x, y);
-            this.showLifeGainMessage(
-                hadMissingLife ? 'Heart Healed!' : 'Love Boost!',
-                hadMissingLife ? 'one life restored' : 'Extra life gained!'
-            );
+            this.showCenteredFloatingScore(hadMissingLife ? 'Heart Healed!' : 'Love Boost!');
             this.triggerVibration([60, 30, 60]);
-
-            if (typeof spawnThreshold === 'number') {
-                this.laysSpawnedAt[spawnThreshold] = true;
-            }
-
-            return;
-        }
-
-        if (kind === 'power' && itemType === 'star') {
-            if (starThreshold !== undefined && starThreshold !== null) {
-                this.starPowerCaughtAt[starThreshold] = true;
-                this.starPowerSpawnedAt[starThreshold] = true;
-            }
-
-            this.activateLuvaGirlPower();
-            this.showGrammySparkles(x, y);
-            this.triggerVibration([90, 40, 90, 40, 120]);
             return;
         }
 
         if (kind === 'bad') {
-            if (this.invincibleActive) {
-                this.showInvincibleTomatoBurst(x, y);
-                this.triggerVibration(25);
-                return;
-            }
-
             this.lives -= 1;
             this.updateLivesDisplay();
             this.showPlayerReaction('bad');
@@ -2196,6 +1986,7 @@ export class Start extends Phaser.Scene {
 
     activateLuvBomb() {
         if (this.isGameOver) return;
+        if (this.luvBombActive) return;
 
         if (this.luvBombTimer) {
             this.luvBombTimer.remove(false);
@@ -2203,52 +1994,28 @@ export class Start extends Phaser.Scene {
         }
 
         this.luvBombActive = true;
-        this.preLuvBombBackgroundKey = this.background.texture ? this.background.texture.key : 'backgroundgames1';
 
-        if (!this.invincibleVisibleActive) {
-            this.applyCurrentBaseShipTexture();
-        }
+        this.pauseSpawnTimers();
+        this.clearAllFallingItems();
 
-        this.startLuvBombGlow();
+        this.applyCurrentBaseShipTexture();
+        this.startLuvBombRainbowEffect();
         this.showLuvBombMessage();
 
-        // background switch placeholder using BG3 if you do not have separate Luv.BG yet
-        this.background.setTexture('backgroundgames3');
+        this.time.delayedCall(250, () => {
+            if (!this.isGameOver && this.luvBombActive) {
+                this.resumeSpawnTimers();
+            }
+        });
 
-        this.luvBombTimer = this.time.delayedCall(10000, () => {
+        this.luvBombTimer = this.time.delayedCall(this.luvBombDuration, () => {
             this.endLuvBomb();
         });
     }
 
-    startLuvBombGlow() {
-        if (!this.ship || !this.ship.active) return;
-
-        if (this.luvBombGlowFx && this.luvBombGlowFx.destroy) {
-            this.luvBombGlowFx.destroy();
-            this.luvBombGlowFx = null;
-        }
-
-        if (this.ship.preFX) {
-            this.luvBombGlowFx = this.ship.preFX.addGlow(0xff82d7, 10, 0, false, 0.18, 18);
-        } else if (this.ship.postFX) {
-            this.luvBombGlowFx = this.ship.postFX.addGlow(0xff82d7, 0.8, 0, false, 0.18, 18);
-        }
-
-        if (this.luvBombPulseTween) {
-            this.luvBombPulseTween.stop();
-        }
-
-        this.luvBombPulseTween = this.tweens.add({
-            targets: this.ship,
-            scale: { from: 0.22, to: 0.24 },
-            duration: 240,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
-    }
-
     endLuvBomb() {
+        if (!this.luvBombActive) return;
+
         this.luvBombActive = false;
 
         if (this.luvBombTimer) {
@@ -2256,215 +2023,31 @@ export class Start extends Phaser.Scene {
             this.luvBombTimer = null;
         }
 
-        if (this.luvBombPulseTween) {
-            this.luvBombPulseTween.stop();
-            this.luvBombPulseTween = null;
+        this.pauseSpawnTimers();
+
+        this.burstRemainingHeartsIntoSparkles();
+        this.clearAllFallingItems();
+        this.stopLuvBombRainbowEffect();
+
+        if (this.luvBombMessageTween) {
+            this.luvBombMessageTween.stop();
+            this.luvBombMessageTween = null;
         }
 
-        if (this.luvBombGlowFx && this.luvBombGlowFx.destroy) {
-            this.luvBombGlowFx.destroy();
-            this.luvBombGlowFx = null;
-        }
-
-        if (this.background && this.background.active) {
-            const returnKey = this.getBackgroundKeyForCurrentState();
-            this.background.setTexture(returnKey);
-        }
-
-        if (this.ship && this.ship.active && !this.invincibleVisibleActive) {
-            this.applyCurrentBaseShipTexture();
-        }
-    }
-
-    activateLuvaGirlPower() {
-        if (this.isGameOver) return;
-
-        this.invincibleActive = true;
-        this.invincibleVisibleActive = true;
-        this.starSpawnBoostActive = true;
-
-        if (this.reactionTimer) {
-            this.reactionTimer.remove(false);
-            this.reactionTimer = null;
-        }
-
-        if (this.invincibleGraceTimer) {
-            this.invincibleGraceTimer.remove(false);
-            this.invincibleGraceTimer = null;
-        }
-
-        if (this.starSpawnBoostTimer) {
-            this.starSpawnBoostTimer.remove(false);
-            this.starSpawnBoostTimer = null;
-        }
-
-        this.starSpawnBoostTimer = this.time.delayedCall(this.invincibleDuration - 3000, () => {
-            this.starSpawnBoostActive = false;
-        });
-
-        this.tweens.killTweensOf(this.ship);
-        this.ship.angle = 0;
-        this.ship.y = this.shipBaseY;
-        this.ship.setTexture(this.getBonusShipTexture());
-        this.ship.setScale(0.23);
-
-        this.startInvincibleShipGlow();
-        this.startInvincibleColorCycle();
-        this.startInvincibleHeartBurst();
-        this.showPowerActivatedText();
-        this.showEdgeGlow();
-
-        if (this.invincibleTimer) {
-            this.invincibleTimer.remove(false);
-        }
-
-        this.invincibleTimer = this.time.delayedCall(this.invincibleDuration, () => {
-            this.beginInvincibleGraceSecond();
-        });
-    }
-
-    beginInvincibleGraceSecond() {
-        this.invincibleVisibleActive = false;
-        this.starSpawnBoostActive = false;
-
-        if (this.starSpawnBoostTimer) {
-            this.starSpawnBoostTimer.remove(false);
-            this.starSpawnBoostTimer = null;
-        }
-
-        if (this.invincibleColorTimer) {
-            this.invincibleColorTimer.remove(false);
-            this.invincibleColorTimer = null;
-        }
-
-        if (this.invincibleHeartTimer) {
-            this.invincibleHeartTimer.remove(false);
-            this.invincibleHeartTimer = null;
-        }
-
-        if (this.invinciblePulseTween) {
-            this.invinciblePulseTween.stop();
-            this.invinciblePulseTween = null;
-        }
-
-        if (this.invincibleGlowFx && this.invincibleGlowFx.destroy) {
-            this.invincibleGlowFx.destroy();
-            this.invincibleGlowFx = null;
-        }
-
-        if (this.powerMessageTween) {
-            this.powerMessageTween.stop();
-            this.powerMessageTween = null;
-        }
-
-        if (this.powerMessageColorTimer) {
-            this.powerMessageColorTimer.remove(false);
-            this.powerMessageColorTimer = null;
-        }
-
-        if (this.powerMessageText && this.powerMessageText.active) {
-            this.powerMessageText.destroy();
-            this.powerMessageText = null;
-        }
-
-        if (this.powerSubText && this.powerSubText.active) {
-            this.powerSubText.destroy();
-            this.powerSubText = null;
+        if (this.luvBombMessageText && this.luvBombMessageText.active) {
+            this.luvBombMessageText.destroy();
+            this.luvBombMessageText = null;
         }
 
         if (this.ship && this.ship.active) {
-            this.ship.clearTint();
             this.applyCurrentBaseShipTexture();
         }
 
-        this.clearEdgeGlow();
+        this.specialEventCooldownUntil = this.time.now + 2500;
 
-        if (this.invincibleGraceTimer) {
-            this.invincibleGraceTimer.remove(false);
-        }
-
-        this.invincibleGraceTimer = this.time.delayedCall(this.invincibleGraceDuration, () => {
-            this.endLuvaGirlPower();
-        });
-    }
-
-    startInvincibleShipGlow() {
-        if (!this.ship || !this.ship.active) return;
-
-        if (this.invincibleGlowFx && this.invincibleGlowFx.destroy) {
-            this.invincibleGlowFx.destroy();
-            this.invincibleGlowFx = null;
-        }
-
-        if (this.ship.preFX) {
-            this.invincibleGlowFx = this.ship.preFX.addGlow(0xffffff, 10, 0, false, 0.18, 18);
-        } else if (this.ship.postFX) {
-            this.invincibleGlowFx = this.ship.postFX.addGlow(0xffffff, 0.8, 0, false, 0.18, 18);
-        }
-
-        if (this.invinciblePulseTween) {
-            this.invinciblePulseTween.stop();
-            this.invinciblePulseTween = null;
-        }
-
-        this.invinciblePulseTween = this.tweens.add({
-            targets: this.ship,
-            scale: { from: 0.225, to: 0.245 },
-            duration: 260,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
-    }
-
-    startInvincibleColorCycle() {
-        if (this.invincibleColorTimer) {
-            this.invincibleColorTimer.remove(false);
-        }
-
-        this.invincibleColorTimer = this.time.addEvent({
-            delay: 110,
-            loop: true,
-            callback: () => {
-                if (!this.ship || !this.ship.active || !this.invincibleVisibleActive) return;
-                const color = Phaser.Utils.Array.GetRandom(this.starAuraColors);
-                this.ship.setTint(color);
-            }
-        });
-    }
-
-    startInvincibleHeartBurst() {
-        if (this.invincibleHeartTimer) {
-            this.invincibleHeartTimer.remove(false);
-        }
-
-        this.invincibleHeartTimer = this.time.addEvent({
-            delay: 180,
-            loop: true,
-            callback: () => {
-                if (!this.ship || !this.ship.active || !this.invincibleVisibleActive || this.isGameOver) return;
-                this.spawnMiniHeartAroundShip();
-            }
-        });
-    }
-
-    spawnMiniHeartAroundShip() {
-        const heartKey = Phaser.Utils.Array.GetRandom(this.heartKeys);
-        const miniHeart = this.add.image(
-            this.ship.x + Phaser.Math.Between(-22, 22),
-            this.ship.y + Phaser.Math.Between(-18, 18),
-            heartKey
-        ).setScale(0.11).setDepth(2500);
-
-        this.tweens.add({
-            targets: miniHeart,
-            x: miniHeart.x + Phaser.Math.Between(-16, 16),
-            y: miniHeart.y - Phaser.Math.Between(26, 44),
-            alpha: 0,
-            angle: Phaser.Math.Between(-18, 18),
-            duration: 700,
-            onComplete: () => {
-                miniHeart.destroy();
+        this.time.delayedCall(420, () => {
+            if (!this.isGameOver) {
+                this.resumeSpawnTimers();
             }
         });
     }
@@ -2490,237 +2073,144 @@ export class Start extends Phaser.Scene {
         }
     }
 
-    showInvincibleTomatoBurst(x, y) {
-        for (let i = 0; i < 4; i++) {
-            const heartKey = Phaser.Utils.Array.GetRandom(this.heartKeys);
-            const burst = this.add.image(
-                x + Phaser.Math.Between(-10, 10),
-                y + Phaser.Math.Between(-10, 10),
-                heartKey
-            ).setScale(0.1).setDepth(2400);
-
-            this.tweens.add({
-                targets: burst,
-                x: burst.x + Phaser.Math.Between(-20, 20),
-                y: burst.y - Phaser.Math.Between(12, 30),
-                alpha: 0,
-                duration: 420,
-                onComplete: () => burst.destroy()
-            });
-        }
-    }
-
-    showPowerActivatedText() {
-        if (this.powerMessageTween) {
-            this.powerMessageTween.stop();
-            this.powerMessageTween = null;
+    showLevelMessage(text) {
+        if (!this.canShowLevelMessage()) {
+            this.pendingLevelMessage = text;
+            return;
         }
 
-        if (this.powerMessageColorTimer) {
-            this.powerMessageColorTimer.remove(false);
-            this.powerMessageColorTimer = null;
+        if (this.activeLevelMessage && this.activeLevelMessage.active) {
+            this.activeLevelMessage.destroy();
         }
 
-        if (this.powerMessageText && this.powerMessageText.active) {
-            this.powerMessageText.destroy();
-        }
-
-        if (this.powerSubText && this.powerSubText.active) {
-            this.powerSubText.destroy();
-        }
-
-        this.powerMessageText = this.add.text(180, 300, 'Luva Girl Activated', {
-            fontSize: '26px',
-            align: 'center',
-            color: '#8d2d5f',
-            stroke: '#3e0f25',
-            strokeThickness: 6,
-            shadow: { offsetX: 0, offsetY: 0, color: '#000000', blur: 10, fill: true }
-        }).setOrigin(0.5).setDepth(3000).setAlpha(1);
-
-        this.powerSubText = this.add.text(180, 330, 'Immune to Tomatoes', {
-            fontSize: '16px',
-            align: 'center',
-            color: '#ffffff',
-            stroke: '#3e0f25',
-            strokeThickness: 4,
-            shadow: { offsetX: 0, offsetY: 0, color: '#000000', blur: 6, fill: true }
-        }).setOrigin(0.5).setDepth(3000).setAlpha(1);
-
-        this.powerMessageColorTimer = this.time.addEvent({
-            delay: 130,
-            loop: true,
-            callback: () => {
-                if (!this.powerMessageText || !this.powerMessageText.active || !this.invincibleVisibleActive) return;
-                const nextColor = Phaser.Utils.Array.GetRandom(this.messageFillColors);
-                this.powerMessageText.setColor(nextColor);
-            }
-        });
-
-        this.powerMessageTween = this.tweens.add({
-            targets: [this.powerMessageText, this.powerSubText],
-            alpha: 0,
-            duration: this.invincibleDuration,
-            ease: 'Linear',
-            onComplete: () => {
-                if (this.powerMessageColorTimer) {
-                    this.powerMessageColorTimer.remove(false);
-                    this.powerMessageColorTimer = null;
-                }
-
-                if (this.powerMessageText && this.powerMessageText.active) {
-                    this.powerMessageText.destroy();
-                }
-
-                if (this.powerSubText && this.powerSubText.active) {
-                    this.powerSubText.destroy();
-                }
-
-                this.powerMessageText = null;
-                this.powerSubText = null;
-                this.powerMessageTween = null;
-            }
-        });
-    }
-
-    showLifeGainMessage(title, subtitle) {
-        const main = this.add.text(180, 255, title, {
-            fontSize: '28px',
-            color: '#ffffff',
+        const levelText = this.add.text(180, 96, text, {
+            fontSize: '24px',
+            color: '#ffff66',
             stroke: '#000000',
             strokeThickness: 6,
-            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 18, fill: true }
-        }).setOrigin(0.5).setDepth(3000);
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 16, fill: true }
+        }).setOrigin(0.5).setDepth(2600);
 
-        const sub = this.add.text(180, 286, subtitle, {
-            fontSize: '16px',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 4,
-            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 12, fill: true }
-        }).setOrigin(0.5).setDepth(3000);
+        this.activeLevelMessage = levelText;
 
         this.tweens.add({
-            targets: [main, sub],
+            targets: levelText,
             alpha: 0,
-            y: '-=26',
-            duration: 1400,
+            scale: 1.05,
+            delay: 2200,
+            duration: 500,
             onComplete: () => {
-                main.destroy();
-                sub.destroy();
+                if (levelText && levelText.active) levelText.destroy();
+                if (this.activeLevelMessage === levelText) {
+                    this.activeLevelMessage = null;
+                }
             }
         });
     }
 
-    showEdgeGlow() {
-        this.clearEdgeGlow();
-
-        const depth = 2800;
-        const glowColor = 0xe2b7ff;
-
-        const top = this.add.rectangle(180, 7, 360, 14, glowColor, 0.26).setDepth(depth);
-        const bottom = this.add.rectangle(180, 633, 360, 14, glowColor, 0.26).setDepth(depth);
-        const left = this.add.rectangle(7, 320, 14, 640, glowColor, 0.26).setDepth(depth);
-        const right = this.add.rectangle(353, 320, 14, 640, glowColor, 0.26).setDepth(depth);
-
-        this.edgeGlowRects = [top, bottom, left, right];
-
-        this.edgeGlowTween = this.tweens.add({
-            targets: this.edgeGlowRects,
-            alpha: { from: 0.18, to: 0.5 },
-            duration: 260,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
-    }
-
-    clearEdgeGlow() {
-        if (this.edgeGlowTween) {
-            this.edgeGlowTween.stop();
-            this.edgeGlowTween = null;
+    showLuvBombMessage() {
+        if (this.luvBombMessageTween) {
+            this.luvBombMessageTween.stop();
+            this.luvBombMessageTween = null;
         }
 
-        this.edgeGlowRects.forEach((rect) => {
-            if (rect && rect.active) {
-                rect.destroy();
+        if (this.luvBombMessageText && this.luvBombMessageText.active) {
+            this.luvBombMessageText.destroy();
+        }
+
+        this.luvBombMessageText = this.add.text(180, 96, 'LUV BOMB ATTACK!', {
+            fontFamily: 'Arial',
+            fontSize: '28px',
+            fontStyle: 'bold',
+            color: '#ff7ecf',
+            stroke: '#000000',
+            strokeThickness: 6,
+            shadow: { offsetX: 0, offsetY: 0, color: '#ffffff', blur: 10, fill: true }
+        }).setOrigin(0.5).setDepth(2600).setAlpha(1);
+
+        this.luvBombMessageTween = this.tweens.add({
+            targets: this.luvBombMessageText,
+            alpha: 0,
+            duration: this.luvBombDuration,
+            ease: 'Linear',
+            onComplete: () => {
+                if (this.luvBombMessageText && this.luvBombMessageText.active) {
+                    this.luvBombMessageText.destroy();
+                }
+
+                this.luvBombMessageText = null;
+                this.luvBombMessageTween = null;
             }
         });
-
-        this.edgeGlowRects = [];
     }
 
-    endLuvaGirlPower() {
-        this.invincibleActive = false;
-        this.invincibleVisibleActive = false;
-        this.starSpawnBoostActive = false;
+    showFloatingScore(text) {
+        const msg = this.add.text(this.ship.x, this.ship.y - 95, text, {
+            fontSize: '22px',
+            color: '#ffff66',
+            stroke: '#000',
+            strokeThickness: 4,
+            shadow: { offsetX: 0, offsetY: 0, color: '#ffff66', blur: 12, fill: true }
+        }).setOrigin(0.5);
 
-        if (this.starSpawnBoostTimer) {
-            this.starSpawnBoostTimer.remove(false);
-            this.starSpawnBoostTimer = null;
-        }
+        this.tweens.add({
+            targets: msg,
+            y: msg.y - 55,
+            alpha: 0,
+            duration: 1200,
+            onComplete: () => {
+                msg.destroy();
+            }
+        });
+    }
 
-        if (this.invincibleTimer) {
-            this.invincibleTimer.remove(false);
-            this.invincibleTimer = null;
-        }
+    showCenteredFloatingScore(text) {
+        const msg = this.add.text(180, this.ship.y - 95, text, {
+            fontSize: '22px',
+            color: '#ffff66',
+            stroke: '#000',
+            strokeThickness: 4,
+            shadow: { offsetX: 0, offsetY: 0, color: '#ffff66', blur: 12, fill: true }
+        }).setOrigin(0.5);
 
-        if (this.invincibleGraceTimer) {
-            this.invincibleGraceTimer.remove(false);
-            this.invincibleGraceTimer = null;
-        }
+        this.activeCenterMessage = msg;
 
-        if (this.invincibleColorTimer) {
-            this.invincibleColorTimer.remove(false);
-            this.invincibleColorTimer = null;
-        }
+        this.tweens.add({
+            targets: msg,
+            y: msg.y - 55,
+            alpha: 0,
+            duration: 1200,
+            onComplete: () => {
+                if (this.activeCenterMessage === msg) {
+                    this.activeCenterMessage = null;
+                }
+                msg.destroy();
+            }
+        });
+    }
 
-        if (this.invincibleHeartTimer) {
-            this.invincibleHeartTimer.remove(false);
-            this.invincibleHeartTimer = null;
-        }
+    showBadPenalty() {
+        const msg = this.add.text(this.ship.x, this.ship.y - 100, '-1 Eeyuck', {
+            fontSize: '22px',
+            color: '#ff4d4d',
+            stroke: '#4b0000',
+            strokeThickness: 4,
+            shadow: { offsetX: 0, offsetY: 0, color: '#ff4d4d', blur: 10, fill: true }
+        }).setOrigin(0.5);
 
-        if (this.invinciblePulseTween) {
-            this.invinciblePulseTween.stop();
-            this.invinciblePulseTween = null;
-        }
-
-        if (this.invincibleGlowFx && this.invincibleGlowFx.destroy) {
-            this.invincibleGlowFx.destroy();
-            this.invincibleGlowFx = null;
-        }
-
-        if (this.powerMessageTween) {
-            this.powerMessageTween.stop();
-            this.powerMessageTween = null;
-        }
-
-        if (this.powerMessageColorTimer) {
-            this.powerMessageColorTimer.remove(false);
-            this.powerMessageColorTimer = null;
-        }
-
-        if (this.powerMessageText && this.powerMessageText.active) {
-            this.powerMessageText.destroy();
-            this.powerMessageText = null;
-        }
-
-        if (this.powerSubText && this.powerSubText.active) {
-            this.powerSubText.destroy();
-            this.powerSubText = null;
-        }
-
-        if (this.ship && this.ship.active) {
-            this.ship.clearTint();
-            this.applyCurrentBaseShipTexture();
-        }
-
-        this.clearEdgeGlow();
+        this.tweens.add({
+            targets: msg,
+            y: msg.y - 45,
+            alpha: 0,
+            duration: 1100,
+            onComplete: () => {
+                msg.destroy();
+            }
+        });
     }
 
     showPlayerReaction(type) {
         if (!this.ship || !this.ship.active || this.isGameOver) return;
-        if (this.invincibleVisibleActive) return;
 
         if (this.reactionTimer) {
             this.reactionTimer.remove(false);
@@ -2818,39 +2308,33 @@ export class Start extends Phaser.Scene {
         if (this.heartsCaught >= 200) speed = 9;
         if (this.heartsCaught >= 300) speed = 10;
 
-        if (this.flowStateActive) speed += 1;
-
         if (this.chaosModeActive) {
             speed = 10;
             if (this.heartsCaught >= 1050) speed = 11;
             if (this.heartsCaught >= 1150) speed = 12;
             if (this.heartsCaught >= 1250) speed = 13;
-            if (this.heartsCaught >= 1350) speed = 14;
         }
 
         this.currentFallSpeed = speed;
     }
 
-    getBackgroundKeyForCurrentState() {
-        if (this.chaosModeActive) return 'backgroundgames4';
-        if (this.flowStateActive) return 'backgroundgames3';
-        if (this.superStarShown) return 'backgroundgames2';
-        return 'backgroundgames1';
-    }
-
     checkLevelProgress() {
         this.updateFallSpeedByHearts();
-        this.maybeQueueStarPowerup();
         this.maybeQueueLays();
-        this.maybeQueueGrammy();
         this.maybeTriggerLuvBomb();
+
+        if (!this.luvBombActive && !this.activeCenterMessage && !this.activeLevelMessage && this.pendingLevelMessage) {
+            const pending = this.pendingLevelMessage;
+            this.pendingLevelMessage = null;
+            this.showLevelMessage(pending);
+        }
 
         if (this.heartsCaught >= 950 && !this.chaosShown) {
             this.chaosShown = true;
             this.chaosModeActive = true;
             this.currentLevelName = 'Chaos Mode';
             this.background.setTexture('backgroundgames4');
-            this.showLevelMessage('Chaos Mode Level Reached!');
+            this.queueOrShowLevelMessage('CHAOS MODE');
             return;
         }
 
@@ -2859,156 +2343,51 @@ export class Start extends Phaser.Scene {
             this.flowStateActive = true;
             this.currentLevelName = 'Flow State';
             this.background.setTexture('backgroundgames3');
-            this.showLevelMessage('Flow State Level Reached!');
+            this.queueOrShowLevelMessage('FLOW STATE REACHED!');
             return;
         }
 
-        if (this.heartsCaught >= 150 && !this.legendaryShown) {
+        if (this.heartsCaught >= 200 && !this.legendaryShown) {
             this.legendaryShown = true;
             this.currentLevelName = 'Legendary';
-            this.showLevelMessage('Legendary Level Reached!');
+            this.queueOrShowLevelMessage('LEGENDARY REACHED!');
             return;
         }
 
-        if (this.heartsCaught >= 60 && !this.iconLevelShown) {
+        if (this.heartsCaught >= 100 && !this.iconLevelShown) {
             this.iconLevelShown = true;
             this.currentLevelName = 'Icon Level';
             this.grammyUnlocked = true;
-            this.showLevelMessage('Icon Level Reached!');
+            this.grammyForcedSpawnPending = !this.isSpecialEventBlocked();
+            this.queueOrShowLevelMessage('ICON LEVEL REACHED!');
+
+            if (this.gameStarted && !this.isGameOver && !this.grammySpawned && !this.grammyCaught && !this.isSpecialEventBlocked()) {
+                this.triggerGrammyEvent();
+            }
             return;
         }
 
-        if (this.heartsCaught >= 45 && !this.superStarShown) {
+        if (this.heartsCaught >= 60 && !this.superStarShown) {
             this.superStarShown = true;
             this.currentLevelName = 'Super Star';
             this.background.setTexture('backgroundgames2');
-            this.showLevelMessage('Super Star Level Reached!');
+            this.queueOrShowLevelMessage('SUPER STAR REACHED!');
             return;
         }
 
         if (this.heartsCaught >= 30 && !this.starLevelShown) {
             this.starLevelShown = true;
             this.currentLevelName = 'Star';
-            this.showLevelMessage('Star Level Reached!');
+            this.queueOrShowLevelMessage('STAR REACHED!');
             return;
         }
 
         if (this.heartsCaught >= 15 && !this.risingStarShown) {
             this.risingStarShown = true;
             this.currentLevelName = 'Rising Star';
-            this.showLevelMessage('Rising Star Level Reached!');
+            this.queueOrShowLevelMessage('RISING STAR REACHED!');
             return;
         }
-    }
-
-    showLevelMessage(text) {
-        const levelText = this.add.text(180, 245, text, {
-            fontSize: '26px',
-            color: '#ffff66',
-            stroke: '#000000',
-            strokeThickness: 6,
-            shadow: { offsetX: 0, offsetY: 0, color: '#ff69b4', blur: 16, fill: true }
-        }).setOrigin(0.5).setDepth(2605);
-
-        this.tweens.add({
-            targets: levelText,
-            alpha: 0,
-            scale: 1.08,
-            delay: 5000,
-            duration: 700,
-            onComplete: () => {
-                levelText.destroy();
-            }
-        });
-    }
-
-    showLuvBombMessage() {
-        const levelText = this.add.text(180, 245, 'LUV BOMB ATTACK!', {
-            fontSize: '30px',
-            fontStyle: 'bold',
-            color: '#ff7ecf',
-            stroke: '#000000',
-            strokeThickness: 6,
-            shadow: { offsetX: 0, offsetY: 0, color: '#ffffff', blur: 10, fill: true }
-        }).setOrigin(0.5).setDepth(2605).setScale(0.65);
-
-        this.tweens.add({
-            targets: levelText,
-            scale: 1.08,
-            duration: 240,
-            ease: 'Back.Out'
-        });
-
-        this.tweens.add({
-            targets: levelText,
-            alpha: 0,
-            scale: 1.1,
-            delay: 5000,
-            duration: 700,
-            onComplete: () => {
-                levelText.destroy();
-            }
-        });
-    }
-
-    showFloatingScore(text) {
-        const msg = this.add.text(this.ship.x, this.ship.y - 95, text, {
-            fontSize: '22px',
-            color: '#ffff66',
-            stroke: '#000',
-            strokeThickness: 4,
-            shadow: { offsetX: 0, offsetY: 0, color: '#ffff66', blur: 12, fill: true }
-        }).setOrigin(0.5).setDepth(2605);
-
-        this.tweens.add({
-            targets: msg,
-            y: msg.y - 55,
-            alpha: 0,
-            duration: 1200,
-            onComplete: () => {
-                msg.destroy();
-            }
-        });
-    }
-
-    showCenteredFloatingScore(text) {
-        const msg = this.add.text(180, this.ship.y - 95, text, {
-            fontSize: '22px',
-            color: '#ffff66',
-            stroke: '#000',
-            strokeThickness: 4,
-            shadow: { offsetX: 0, offsetY: 0, color: '#ffff66', blur: 12, fill: true }
-        }).setOrigin(0.5).setDepth(2605);
-
-        this.tweens.add({
-            targets: msg,
-            y: msg.y - 55,
-            alpha: 0,
-            duration: 1200,
-            onComplete: () => {
-                msg.destroy();
-            }
-        });
-    }
-
-    showBadPenalty() {
-        const msg = this.add.text(this.ship.x, this.ship.y - 100, '-1 Eeyuck', {
-            fontSize: '22px',
-            color: '#ff4d4d',
-            stroke: '#4b0000',
-            strokeThickness: 4,
-            shadow: { offsetX: 0, offsetY: 0, color: '#ff4d4d', blur: 10, fill: true }
-        }).setOrigin(0.5).setDepth(2605);
-
-        this.tweens.add({
-            targets: msg,
-            y: msg.y - 45,
-            alpha: 0,
-            duration: 1100,
-            onComplete: () => {
-                msg.destroy();
-            }
-        });
     }
 
     updateHighScore() {
@@ -3088,12 +2467,6 @@ export class Start extends Phaser.Scene {
             this.introGatePulseTween = null;
         }
 
-        this.eventScheduleHandles.forEach((h) => {
-            if (h) h.remove(false);
-        });
-        this.eventScheduleHandles = [];
-
-        this.endLuvaGirlPower();
         this.endLuvBomb();
 
         this.items.children.iterate((item) => {
@@ -3266,9 +2639,9 @@ export class Start extends Phaser.Scene {
     getFinalLevelName() {
         if (this.heartsCaught >= 950) return 'Chaos Mode';
         if (this.heartsCaught >= 300) return 'Flow State';
-        if (this.heartsCaught >= 150) return 'Legendary';
-        if (this.heartsCaught >= 60) return 'Icon Level';
-        if (this.heartsCaught >= 45) return 'Super Star';
+        if (this.heartsCaught >= 200) return 'Legendary';
+        if (this.heartsCaught >= 100) return 'Icon Level';
+        if (this.heartsCaught >= 60) return 'Super Star';
         if (this.heartsCaught >= 30) return 'Star';
         if (this.heartsCaught >= 15) return 'Rising Star';
         return 'Luva Girl';
