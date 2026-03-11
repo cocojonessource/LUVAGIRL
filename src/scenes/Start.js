@@ -14,17 +14,17 @@ export class Start extends Phaser.Scene {
 
         this.load.image('LuvaGirl', 'assets/LuvaGirl.PNG');
         this.load.image('Luvagirldrag', 'assets/Luvagirldrag.PNG');
-        this.load.image('LuvaGirlBad', 'assets/LuvaGirlbad.png');
+        this.load.image('LuvaGirlBad', 'assets/LuvaGirlbad.PNG');
         this.load.image('LuvaGirlBonus', 'assets/LuvaGirlbonus.PNG');
 
         this.load.image('Onelife', 'assets/Onelife.PNG');
         this.load.image('OnelifeBad', 'assets/Onelifebad.PNG');
         this.load.image('OnelifeBonus', 'assets/Onelifebonus.PNG');
 
-        this.load.image('heartBlue', 'assets/blue.png');
+        this.load.image('heartBlue', 'assets/blue.PNG');
         this.load.image('heartGreen', 'assets/green.PNG');
         this.load.image('heartPink', 'assets/pink.PNG');
-        this.load.image('heartYellow', 'assets/yellow.PMG');
+        this.load.image('heartYellow', 'assets/yellow.PNG');
 
         this.load.image('lifeFull', 'assets/lifescore.png');
         this.load.image('lifeLost', 'assets/lostscore.png');
@@ -88,7 +88,7 @@ export class Start extends Phaser.Scene {
         this.grammyCaught = false;
         this.grammyEventStarted = false;
 
-        this.laysThresholds = [45, 250, 400, 650, 1200];
+        this.laysThresholds = [45, 250, 650, 1200];
         this.laysSpawnedAt = {};
         this.laysEventActive = false;
 
@@ -944,7 +944,7 @@ export class Start extends Phaser.Scene {
         if (now - this.lastWaveSpawnAt < neededDelay) return;
 
         this.lastWaveSpawnAt = now;
-        this.spawnWave(this.baseWaveSize);
+        this.spawnWave(this.baseWaveSize + (this.heartsCaught >= 350 ? 1 : 0) + (this.luvBombActive ? 3 : 0));
     }
 
     maybeRunRefillWave() {
@@ -963,7 +963,7 @@ export class Start extends Phaser.Scene {
         this.lastRefillSpawnAt = now;
 
         const deficit = targetActive - currentActive;
-        const refillCount = Phaser.Math.Clamp(deficit, 1, this.baseWaveSize + (this.luvBombActive ? 2 : 1));
+        const refillCount = Phaser.Math.Clamp(deficit, 1, this.baseWaveSize + (this.luvBombActive ? 6 : 2));
 
         this.spawnWave(refillCount);
     }
@@ -983,30 +983,32 @@ export class Start extends Phaser.Scene {
         let delay;
 
         if (this.heartsCaught < 5) delay = 1100;
-        else if (this.heartsCaught < 20) delay = 850;
-        else if (this.heartsCaught < 60) delay = 640;
-        else if (this.heartsCaught < 100) delay = 560;
-        else if (this.heartsCaught < 200) delay = 500;
-        else delay = 450;
+        else if (this.heartsCaught < 20) delay = 860;
+        else if (this.heartsCaught < 60) delay = 700;
+        else if (this.heartsCaught < 100) delay = 590;
+        else if (this.heartsCaught < 200) delay = 520;
+        else if (this.heartsCaught < 350) delay = 470;
+        else delay = 470;
 
-        if (this.luvBombActive) delay -= 420;
+        if (this.luvBombActive) delay -= 280;
 
-        return Phaser.Math.Clamp(delay, 140, 1500);
+        return Phaser.Math.Clamp(delay, 110, 1500);
     }
 
     getRefillDelayByHearts() {
         let delay;
 
-        if (this.heartsCaught < 5) delay = 1300;
-        else if (this.heartsCaught < 20) delay = 980;
-        else if (this.heartsCaught < 60) delay = 760;
-        else if (this.heartsCaught < 100) delay = 620;
-        else if (this.heartsCaught < 200) delay = 540;
+        if (this.heartsCaught < 5) delay = 1200;
+        else if (this.heartsCaught < 20) delay = 1000;
+        else if (this.heartsCaught < 60) delay = 780;
+        else if (this.heartsCaught < 100) delay = 650;
+        else if (this.heartsCaught < 200) delay = 560;
+        else if (this.heartsCaught < 350) delay = 500;
         else delay = 500;
 
-        if (this.luvBombActive) delay -= 430;
+        if (this.luvBombActive) delay -= 300;
 
-        return Phaser.Math.Clamp(delay, 140, 1600);
+        return Phaser.Math.Clamp(delay, 100, 1600);
     }
 
     getTargetActiveItemsByHearts() {
@@ -1017,11 +1019,12 @@ export class Start extends Phaser.Scene {
         else if (this.heartsCaught < 60) total = 4;
         else if (this.heartsCaught < 100) total = 5;
         else if (this.heartsCaught < 200) total = 6;
+        else if (this.heartsCaught < 350) total = 7;
         else total = 7;
 
-        if (this.luvBombActive) total += 6;
+        if (this.luvBombActive) total += 9;
 
-        return Phaser.Math.Clamp(total, 1, 12);
+        return Phaser.Math.Clamp(total, 1, 16);
     }
 
     pauseSpawnTimers() {
@@ -1659,18 +1662,18 @@ export class Start extends Phaser.Scene {
         }
 
         if (this.heartsCaught < 60) {
-            return { heart: 56, tomato: 36, ramen: 4, music: 4 };
+            return { heart: 58, tomato: 34, ramen: 4, music: 4 };
         }
 
         if (this.heartsCaught < 100) {
-            return { heart: 40, tomato: 50, ramen: 5, music: 5 };
+            return { heart: 43, tomato: 48, ramen: 5, music: 4 };
         }
 
         if (this.heartsCaught < 200) {
-            return { heart: 36, tomato: 54, ramen: 5, music: 5 };
+            return { heart: 40, tomato: 50, ramen: 5, music: 5 };
         }
 
-        return { heart: 34, tomato: 56, ramen: 5, music: 5 };
+        return { heart: 38, tomato: 52, ramen: 5, music: 5 };
     }
 
     chooseItemType() {
@@ -1894,7 +1897,7 @@ export class Start extends Phaser.Scene {
             this.applyCurrentBaseShipTexture();
         }
 
-        this.time.delayedCall(320, () => {
+        this.time.delayedCall(420, () => {
             if (!this.isGameOver) {
                 this.resumeSpawnTimers();
             }
@@ -2007,7 +2010,6 @@ export class Start extends Phaser.Scene {
         }
 
         this.luvBombMessageText = this.add.text(180, 220, 'LUV BOMB\nATTACK!!!', {
-            fontFamily: '"Arial Black", "Comic Sans MS", cursive',
             fontSize: '30px',
             fontStyle: 'bold',
             color: '#ff7ecf',
@@ -2082,10 +2084,10 @@ export class Start extends Phaser.Scene {
         }
     }
 
-    // restored to plain non-cursive style
     showTopLifeMessage(title, subtext) {
         const titleText = this.add.text(180, 180, title, {
             fontSize: '24px',
+            fontStyle: 'bold',
             color: '#ff8fd8',
             stroke: '#6d3bb8',
             strokeThickness: 8,
@@ -2096,7 +2098,9 @@ export class Start extends Phaser.Scene {
             fontSize: '14px',
             align: 'center',
             color: '#ffffff',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            stroke: '#4b1e6d',
+            strokeThickness: 3
         }).setOrigin(0.5).setDepth(2600);
 
         this.activeLevelMessage = titleText;
@@ -2128,9 +2132,8 @@ export class Start extends Phaser.Scene {
         });
     }
 
-    // restored to plain non-cursive style
     showLevelMessage(text, shouldPulse = false, isFlowState = false) {
-        const levelText = this.add.text(180, 96, text, {
+        const levelText = this.add.text(180, 200, text, {
             fontSize: '23px',
             align: 'center',
             color: isFlowState ? '#ff8cf5' : '#ffff66',
@@ -2139,19 +2142,19 @@ export class Start extends Phaser.Scene {
             shadow: {
                 offsetX: 0,
                 offsetY: 0,
-                color: '#ff69b4',
-                blur: 16,
+                color: isFlowState ? '#ffffff' : '#ff69b4',
+                blur: isFlowState ? 22 : 16,
                 fill: true
             }
         }).setOrigin(0.5).setDepth(2600);
 
         this.activeLevelMessage = levelText;
 
-        if (shouldPulse) {
+        if (shouldPulse || isFlowState) {
             this.tweens.add({
                 targets: levelText,
-                scale: { from: 1, to: 1.08 },
-                duration: 320,
+                scale: { from: 1, to: isFlowState ? 1.12 : 1.08 },
+                duration: isFlowState ? 220 : 320,
                 yoyo: true,
                 repeat: -1,
                 ease: 'Sine.easeInOut'
@@ -2162,10 +2165,10 @@ export class Start extends Phaser.Scene {
 
         if (isFlowState) {
             let colorIndex = 0;
-            const flowTextColors = ['#ff8cf5', '#ffd36b', '#fff77c', '#9dff8c', '#7df9ff', '#9d8cff'];
+            const flowTextColors = ['#ff8cf5', '#ffd36b', '#fff77c', '#9dff8c', '#7df9ff', '#9d8cff', '#ffffff'];
 
             rainbowTimer = this.time.addEvent({
-                delay: 120,
+                delay: 90,
                 loop: true,
                 callback: () => {
                     if (!levelText || !levelText.active) return;
