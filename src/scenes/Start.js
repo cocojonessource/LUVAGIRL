@@ -6,25 +6,25 @@ export class Start extends Phaser.Scene {
     preload() {
         this.load.image('backgroundgames1', 'assets/BG1.png');
         this.load.image('backgroundgames2', 'assets/BG2.png');
-        this.load.image('backgroundgames3', 'assets/BG3.png');
-        this.load.image('backgroundgames4', 'assets/BG4.png');
+        this.load.image('backgroundgames3', 'assets/BG3.PNG');
+        this.load.image('backgroundgames4', 'assets/BG4.PNG');
 
         this.load.image('openover', 'assets/Tomatoend1.PNG');
         this.load.image('closeover', 'assets/Tomatoend2.PNG');
 
-        this.load.image('LuvaGirl', 'assets/LuvaGirl.png');
-        this.load.image('Luvagirldrag', 'assets/Luvagirldrag.png');
+        this.load.image('LuvaGirl', 'assets/LuvaGirl.PNG');
+        this.load.image('Luvagirldrag', 'assets/Luvagirldrag.PNG');
         this.load.image('LuvaGirlBad', 'assets/LuvaGirlbad.png');
-        this.load.image('LuvaGirlBonus', 'assets/LuvaGirlbonus.png');
+        this.load.image('LuvaGirlBonus', 'assets/LuvaGirlbonus.PNG');
 
-        this.load.image('Onelife', 'assets/Onelife.png');
-        this.load.image('OnelifeBad', 'assets/Onelifebad.png');
-        this.load.image('OnelifeBonus', 'assets/Onelifebonus.png');
+        this.load.image('Onelife', 'assets/Onelife.PNG');
+        this.load.image('OnelifeBad', 'assets/Onelifebad.PNG');
+        this.load.image('OnelifeBonus', 'assets/Onelifebonus.PNG');
 
         this.load.image('heartBlue', 'assets/blue.png');
-        this.load.image('heartGreen', 'assets/green.png');
-        this.load.image('heartPink', 'assets/pink.png');
-        this.load.image('heartYellow', 'assets/yellow.png');
+        this.load.image('heartGreen', 'assets/green.PNG');
+        this.load.image('heartPink', 'assets/pink.PNG');
+        this.load.image('heartYellow', 'assets/yellow.PMG');
 
         this.load.image('lifeFull', 'assets/lifescore.png');
         this.load.image('lifeLost', 'assets/lostscore.png');
@@ -33,7 +33,7 @@ export class Start extends Phaser.Scene {
         this.load.image('grammy', 'assets/grammy.png');
         this.load.image('ramenItem', 'assets/ramen.png');
         this.load.image('noteItem', 'assets/note.png');
-        this.load.image('laysItem', 'assets/Lays.png');
+        this.load.image('laysItem', 'assets/Lays.PNG');
 
         this.load.audio('gameOverSound', 'assets/GameOver.mp3');
         this.load.audio('bgMusic', 'assets/BGmusic.mp3');
