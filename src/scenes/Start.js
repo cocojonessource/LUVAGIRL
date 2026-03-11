@@ -1813,7 +1813,7 @@ export class Start extends Phaser.Scene {
 
             this.pendingAnnouncements.push({
                 type: 'boost',
-                title: hadMissingLife ? 'Heart Healed!' : 'Love Boost!',
+                title: hadMissingLife ? 'Heart Healed!' : 'Luv Boost!',
                 subtext: hadMissingLife ? 'One Life Restored' : 'One Extra Life Gained'
             });
             this.playNextAnnouncement();
@@ -2010,7 +2010,7 @@ export class Start extends Phaser.Scene {
     }
 
     this.luvBombMessageText = this.add.text(180, 220, 'LUV BOMB\nATTACK!!!', {
-        fontSize: '24px',
+        fontSize: '30px',
         fontStyle: 'bold',
         color: '#ff8fd8',
         stroke: '#6d3bb8',
